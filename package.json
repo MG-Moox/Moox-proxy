@@ -1,12 +1,22 @@
 {
-  "name": "web-proxy",
-  "version": "1.0.0",
-  "description": "Tiny dependency-free web proxy",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  }
+	"name": "moox-proxy",
+	"version": "2.0.0",
+	"description": "Moox Proxy, a password-protected web proxy powered by Scramjet",
+	"type": "module",
+	"main": "src/index.js",
+	"scripts": {
+		"start": "node src/index.js"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"license": "AGPL-3.0-only",
+	"dependencies": {
+		"@fastify/static": "^9.0.0",
+		"@mercuryworkshop/bare-mux": "^2.1.9",
+		"@mercuryworkshop/libcurl-transport": "^1.5.2",
+		"@mercuryworkshop/scramjet": "https://github.com/MercuryWorkshop/scramjet/releases/download/v1.1.0/mercuryworkshop-scramjet-1.1.0.tgz",
+		"@mercuryworkshop/wisp-js": "^0.4.1",
+		"fastify": "^5.7.4"
+	}
 }
