@@ -7,11 +7,11 @@
 //
 // Env vars:
 //   PORT            port to listen on (default 8080)
-//   PROXY_PASSWORD  if set, require HTTP basic auth (any username) for the site
-//                   AND the Wisp endpoint. Strongly recommended when public.
+//   PROXY_PASSWORD  if set, require a login (cookie) for the site AND the Wisp
+//                   endpoint. Strongly recommended when public.
 import { createServer } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { createAuth } from "./auth.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -46,20 +46,8 @@ Object.assign(wisp.options, {
 	dns_servers: ["1.1.1.3", "1.0.0.3"],
 });
 
-// ---------- Auth ----------
-function authorized(req) {
-	if (!PASSWORD) return true;
-	const header = req.headers.authorization || "";
-	if (!header.startsWith("Basic ")) return false;
-	const given = Buffer.from(header.slice(6), "base64")
-		.toString()
-		.split(":")
-		.slice(1)
-		.join(":");
-	const a = Buffer.from(given);
-	const b = Buffer.from(PASSWORD);
-	return a.length === b.length && timingSafeEqual(a, b);
-}
+// ---------- Auth (login page + cookie, see auth.js) ----------
+const auth = createAuth(PASSWORD);
 
 // ---------- Server ----------
 const fastify = Fastify({
@@ -71,17 +59,15 @@ const fastify = Fastify({
 					res.writeHead(200, { "content-type": "text/plain" });
 					return res.end("ok");
 				}
-				if (!authorized(req)) {
-					res.writeHead(401, { "WWW-Authenticate": 'Basic realm="Moox Proxy"' });
-					return res.end("Authentication required");
-				}
+				// Serves /login and /logout, and redirects or rejects anyone not logged in.
+				if (auth.handle(req, res)) return;
 				// Scramjet needs cross-origin isolation.
 				res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 				res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
 				handler(req, res);
 			})
 			.on("upgrade", (req, socket, head) => {
-				if (!authorized(req)) {
+				if (!auth.isAuthorized(req)) {
 					socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
 					return;
 				}
