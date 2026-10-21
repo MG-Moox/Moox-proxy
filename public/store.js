@@ -35,6 +35,14 @@ const Store = (() => {
 			write(KEY_FAV, list);
 			return i < 0;
 		},
+		// Adds a favorite if it isn't there already (never removes).
+		addFavorite(url, title) {
+			const list = read(KEY_FAV);
+			if (list.some((f) => f.url === url)) return false;
+			list.push({ url, title: title || url, added: Date.now() });
+			write(KEY_FAV, list);
+			return true;
+		},
 		removeFavorite(url) {
 			write(KEY_FAV, read(KEY_FAV).filter((f) => f.url !== url));
 		},

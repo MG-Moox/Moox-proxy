@@ -9,10 +9,12 @@ const bar = $("bar");
 const barForm = $("bar-form");
 const barAddress = $("bar-address");
 const favBtn = $("btn-fav");
-const library = $("library");
-const libList = $("lib-list");
-const libEmpty = $("lib-empty");
+const favGrid = $("fav-grid");
+const menu = $("menu");
+const histList = $("hist-list");
+const histEmpty = $("hist-empty");
 const clearBtn = $("btn-clear");
+const menuButtons = [$("btn-menu"), $("btn-menu-home")];
 
 const { ScramjetController } = $scramjetLoadController();
 const scramjet = new ScramjetController({
@@ -28,7 +30,34 @@ const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 
 let frame = null; // the current ScramjetFrame, or null on the home page
 let currentUrl = ""; // real (un-proxied) address of the page being viewed
-let tab = "fav"; // "fav" or "hist"
+
+// ---------- Site icons ----------
+function hostOf(url) {
+	try {
+		return new URL(url).host;
+	} catch {
+		return url;
+	}
+}
+
+// A colored letter tile; the real icon (served by /icon) covers it once loaded.
+function makeIcon(url, small) {
+	const host = hostOf(url).replace(/^www\./, "");
+	const el = document.createElement("span");
+	el.className = "ico" + (small ? " sm" : "");
+	let hue = 0;
+	for (const ch of host) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+	el.style.background = `hsl(${hue} 45% 45%)`;
+	el.textContent = (host[0] || "?").toUpperCase();
+
+	const img = document.createElement("img");
+	img.alt = "";
+	img.loading = "lazy";
+	img.addEventListener("error", () => img.remove());
+	img.src = "/icon?domain=" + encodeURIComponent(hostOf(url).split(":")[0]);
+	el.appendChild(img);
+	return el;
+}
 
 // ---------- Opening sites ----------
 async function startProxy() {
@@ -53,8 +82,8 @@ function showBrowsing(on) {
 	document.body.classList.toggle("browsing", on);
 	bar.hidden = !on;
 	$("home").hidden = on;
-	library.classList.remove("open");
-	if (!on) renderLibrary();
+	closeMenu();
+	if (!on) renderFavorites();
 }
 
 function openFrame() {
@@ -69,8 +98,7 @@ function openFrame() {
 		barAddress.value = currentUrl;
 		Store.addHistory(currentUrl, "");
 		updateFavButton();
-		if (!library.classList.contains("open")) return;
-		renderLibrary();
+		if (!menu.hidden) renderHistory();
 	});
 
 	// Once a page has loaded, record its real title.
@@ -79,7 +107,7 @@ function openFrame() {
 			const title = frame.frame.contentDocument.title;
 			if (currentUrl && title) {
 				Store.updateTitle(currentUrl, title);
-				if (library.classList.contains("open")) renderLibrary();
+				if (!menu.hidden) renderHistory();
 			}
 		} catch {}
 	});
@@ -109,27 +137,66 @@ function closeFrame() {
 	showBrowsing(false);
 }
 
-// ---------- Favorites / history panel ----------
-function hostOf(url) {
-	try {
-		return new URL(url).host;
-	} catch {
-		return url;
+// ---------- Favorites grid (home page) ----------
+function renderFavorites() {
+	favGrid.textContent = "";
+
+	for (const fav of Store.favorites()) {
+		const tile = document.createElement("div");
+		tile.className = "tile";
+
+		const open = document.createElement("button");
+		open.type = "button";
+		open.className = "tile-open";
+		const name = document.createElement("span");
+		name.className = "name";
+		name.textContent = fav.title || hostOf(fav.url);
+		open.title = fav.title || fav.url;
+		open.append(makeIcon(fav.url, false), name);
+		open.addEventListener("click", () => go(fav.url));
+
+		const x = document.createElement("button");
+		x.type = "button";
+		x.className = "x";
+		x.title = "Remove";
+		x.setAttribute("aria-label", "Remove " + (fav.title || fav.url));
+		x.textContent = "×";
+		x.addEventListener("click", () => {
+			Store.removeFavorite(fav.url);
+			renderFavorites();
+		});
+
+		tile.append(open, x);
+		favGrid.appendChild(tile);
 	}
+
+	const add = document.createElement("button");
+	add.type = "button";
+	add.className = "tile add";
+	const plus = document.createElement("span");
+	plus.className = "ico";
+	plus.textContent = "+";
+	const label = document.createElement("span");
+	label.className = "name";
+	label.textContent = "Add favorite";
+	add.append(plus, label);
+	add.addEventListener("click", () => {
+		const input = prompt("Website to add (for example wikipedia.org):");
+		if (!input || !input.trim()) return;
+		const url = toUrl(input);
+		if (!isRealPage(url)) return;
+		Store.addFavorite(url, hostOf(url).replace(/^www\./, ""));
+		renderFavorites();
+	});
+	favGrid.appendChild(add);
 }
 
-function renderLibrary() {
-	const items = tab === "fav" ? Store.favorites() : Store.history();
-	$("tab-fav").classList.toggle("active", tab === "fav");
-	$("tab-hist").classList.toggle("active", tab === "hist");
-	clearBtn.hidden = tab !== "hist" || items.length === 0;
-
-	libList.textContent = "";
-	libEmpty.textContent = items.length
-		? ""
-		: tab === "fav"
-			? "No favorites yet. Open a site and press the star."
-			: "No history yet.";
+// ---------- History menu ----------
+function renderHistory() {
+	const items = Store.history();
+	clearBtn.hidden = items.length === 0;
+	histList.textContent = "";
+	histEmpty.textContent = items.length ? "" : "No history yet.";
 
 	for (const entry of items) {
 		const li = document.createElement("li");
@@ -137,13 +204,16 @@ function renderLibrary() {
 		const open = document.createElement("button");
 		open.type = "button";
 		open.className = "item";
+		const txt = document.createElement("span");
+		txt.className = "txt";
 		const t = document.createElement("span");
 		t.className = "t";
 		t.textContent = entry.title || entry.url;
 		const u = document.createElement("span");
 		u.className = "u";
 		u.textContent = hostOf(entry.url);
-		open.append(t, u);
+		txt.append(t, u);
+		open.append(makeIcon(entry.url, true), txt);
 		open.addEventListener("click", () => go(entry.url));
 
 		const del = document.createElement("button");
@@ -152,15 +222,23 @@ function renderLibrary() {
 		del.title = "Remove";
 		del.textContent = "×";
 		del.addEventListener("click", () => {
-			if (tab === "fav") Store.removeFavorite(entry.url);
-			else Store.removeHistory(entry.id);
-			renderLibrary();
-			updateFavButton();
+			Store.removeHistory(entry.id);
+			renderHistory();
 		});
 
 		li.append(open, del);
-		libList.appendChild(li);
+		histList.appendChild(li);
 	}
+}
+
+function openMenu() {
+	renderHistory();
+	menu.hidden = false;
+	for (const b of menuButtons) b.setAttribute("aria-expanded", "true");
+}
+function closeMenu() {
+	menu.hidden = true;
+	for (const b of menuButtons) b.setAttribute("aria-expanded", "false");
 }
 
 function updateFavButton() {
@@ -184,10 +262,22 @@ $("btn-home").addEventListener("click", closeFrame);
 $("btn-back").addEventListener("click", () => frame && frame.back());
 $("btn-forward").addEventListener("click", () => frame && frame.forward());
 $("btn-reload").addEventListener("click", () => frame && frame.reload());
-$("btn-lib").addEventListener("click", () => {
-	renderLibrary();
-	library.classList.toggle("open");
+
+for (const b of menuButtons) {
+	b.addEventListener("click", (event) => {
+		event.stopPropagation();
+		if (menu.hidden) openMenu();
+		else closeMenu();
+	});
+}
+// Click anywhere else, or press Escape, to close the menu.
+document.addEventListener("click", (event) => {
+	if (!menu.hidden && !menu.contains(event.target)) closeMenu();
 });
+document.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") closeMenu();
+});
+
 favBtn.addEventListener("click", () => {
 	if (!currentUrl) return;
 	let title = "";
@@ -196,25 +286,16 @@ favBtn.addEventListener("click", () => {
 	} catch {}
 	Store.toggleFavorite(currentUrl, title);
 	updateFavButton();
-	if (library.classList.contains("open")) renderLibrary();
 });
 
-$("tab-fav").addEventListener("click", () => {
-	tab = "fav";
-	renderLibrary();
-});
-$("tab-hist").addEventListener("click", () => {
-	tab = "hist";
-	renderLibrary();
-});
 clearBtn.addEventListener("click", () => {
 	if (confirm("Clear all browsing history saved in this browser?")) {
 		Store.clearHistory();
-		renderLibrary();
+		renderHistory();
 	}
 });
 
-renderLibrary();
+renderFavorites();
 
 // Keeps the Chrome address-bar shortcut working: https://YOUR-ADDRESS/?url=%s
 const preset = new URLSearchParams(location.search).get("url");
