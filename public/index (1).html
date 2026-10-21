@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Moox Proxy</title>
+		<link rel="stylesheet" href="style.css" />
+		<!-- Order matters: Scramjet bundle, then BareMux -->
+		<script src="/scram/scramjet.all.js"></script>
+		<script src="/baremux/index.js"></script>
+		<script src="register-sw.js" defer></script>
+		<script src="search.js" defer></script>
+		<script src="store.js" defer></script>
+		<script src="app.js" defer></script>
+	</head>
+	<body>
+		<!-- Browser bar, shown while a site is open -->
+		<header id="bar" hidden>
+			<button id="btn-home" title="Home" aria-label="Home">&#8962;</button>
+			<button id="btn-back" title="Back" aria-label="Back">&#8249;</button>
+			<button id="btn-forward" title="Forward" aria-label="Forward">&#8250;</button>
+			<button id="btn-reload" title="Reload" aria-label="Reload">&#10227;</button>
+			<form id="bar-form">
+				<input id="bar-address" type="text" autocomplete="off" aria-label="Address" />
+			</form>
+			<button id="btn-fav" title="Add to favorites" aria-label="Favorite">&#9734;</button>
+			<button id="btn-menu" title="Menu" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+		</header>
+
+		<main id="home">
+			<button id="btn-menu-home" class="corner" title="Menu" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+			<h1>Moox Proxy</h1>
+			<form id="form">
+				<input id="address" type="text" placeholder="Search or enter a website" autocomplete="off" autofocus required />
+				<button type="submit">Go</button>
+			</form>
+			<p id="error" class="err"></p>
+			<pre id="error-code" class="err"></pre>
+
+			<section id="favs" aria-label="Favorites">
+				<div id="fav-grid"></div>
+			</section>
+		</main>
+
+		<!-- Menu: history lives here instead of on the home page -->
+		<div id="menu" role="menu" hidden>
+			<div class="menu-head">
+				<strong>History</strong>
+				<button id="btn-clear" class="small" type="button" hidden>Clear all</button>
+			</div>
+			<ul id="hist-list"></ul>
+			<p id="hist-empty" class="muted"></p>
+			<p class="muted note">Saved in this browser only.</p>
+		</div>
+	</body>
+</html>
