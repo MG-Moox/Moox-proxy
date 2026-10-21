@@ -12,6 +12,7 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createAuth } from "./auth.js";
+import { createIcons } from "./icons.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -48,6 +49,7 @@ Object.assign(wisp.options, {
 
 // ---------- Auth (login page + cookie, see auth.js) ----------
 const auth = createAuth(PASSWORD);
+const icons = createIcons();
 
 // ---------- Server ----------
 const fastify = Fastify({
@@ -61,6 +63,14 @@ const fastify = Fastify({
 				}
 				// Serves /login and /logout, and redirects or rejects anyone not logged in.
 				if (auth.handle(req, res)) return;
+				// Favicons for the favorites grid.
+				if (req.url.startsWith("/icon?")) {
+					icons.handle(req, res).catch(() => {
+						if (!res.headersSent) res.writeHead(500);
+						res.end();
+					});
+					return;
+				}
 				// Scramjet needs cross-origin isolation.
 				res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 				res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
