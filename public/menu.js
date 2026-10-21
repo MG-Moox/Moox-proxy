@@ -1,0 +1,411 @@
+"use strict";
+
+// The ☰ menu: History, Settings and More (backup, shortcuts, log out).
+const Menu = (() => {
+	const menu = document.getElementById("menu");
+	const body = document.getElementById("menu-body");
+	const tabs = [...menu.querySelectorAll(".tab")];
+	const toggleButtons = [document.getElementById("btn-menu"), document.getElementById("btn-menu-home")];
+
+	let ctx = null; // set by init(): { go, makeIcon, hostOf, onDataChange }
+	let tab = "history";
+	let lastFocus = null;
+
+	// ---------- tiny DOM helper (no innerHTML, so nothing can inject markup) ----------
+	function el(tag, attrs = {}, ...kids) {
+		const n = document.createElement(tag);
+		for (const [k, v] of Object.entries(attrs)) {
+			if (v == null || v === false) continue;
+			if (k === "class") n.className = v;
+			else if (k === "text") n.textContent = v;
+			else if (k === "checked" || k === "value") n[k] = v;
+			else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+			else n.setAttribute(k, v === true ? "" : v);
+		}
+		for (const kid of kids.flat()) if (kid != null) n.append(kid);
+		return n;
+	}
+
+	function say(text) {
+		const m = document.getElementById("menu-msg");
+		if (m) m.textContent = text;
+	}
+
+	// ---------- History tab ----------
+	function renderHistory() {
+		const items = Store.history();
+		const list = el("ul", { id: "hist-list" });
+
+		for (const entry of items) {
+			const open = el(
+				"button",
+				{ type: "button", class: "item", onclick: () => ctx.go(entry.url) },
+				ctx.makeIcon(entry.url, true),
+				el("span", { class: "txt" }, el("span", { class: "t", text: entry.title || entry.url }), el("span", { class: "u", text: ctx.hostOf(entry.url) }))
+			);
+			const del = el("button", {
+				type: "button",
+				class: "del",
+				title: "Remove",
+				"aria-label": "Remove " + (entry.title || entry.url) + " from history",
+				text: "×",
+				onclick: () => {
+					Store.removeHistory(entry.id);
+					render();
+				},
+			});
+			list.append(el("li", {}, open, del));
+		}
+
+		body.append(
+			el(
+				"div",
+				{ class: "menu-head" },
+				el("strong", { text: "History" }),
+				items.length
+					? el("button", {
+							type: "button",
+							class: "btn",
+							text: "Clear all",
+							onclick: () => {
+								if (confirm("Clear all browsing history saved in this browser?")) {
+									Store.clearHistory();
+									render();
+								}
+							},
+						})
+					: null
+			),
+			list,
+			el("p", { class: "muted", text: items.length ? "" : "No history yet." }),
+			el("p", { class: "muted", text: "Saved in this browser only." })
+		);
+	}
+
+	// ---------- Settings tab ----------
+	let rowId = 0;
+	const uid = () => "set-" + ++rowId;
+
+	function selectRow(label, key, options, hint) {
+		const id = uid();
+		const sel = el("select", { id });
+		for (const [value, text] of options) sel.append(el("option", { value: String(value), text }));
+		sel.value = String(Settings.get(key));
+		sel.addEventListener("change", () => {
+			const isNumber = typeof Settings.defaults[key] === "number";
+			Settings.set(key, isNumber ? Number(sel.value) : sel.value);
+		});
+		return [el("div", { class: "row" }, el("label", { for: id, text: label }), sel), hint ? el("p", { class: "hint", text: hint }) : null];
+	}
+
+	function toggleRow(label, key, hint) {
+		const id = uid();
+		const cb = el("input", { type: "checkbox", id, class: "switch", role: "switch", checked: Settings.get(key) });
+		cb.addEventListener("change", () => Settings.set(key, cb.checked));
+		return [el("div", { class: "row" }, el("label", { for: id, text: label }), cb), hint ? el("p", { class: "hint", text: hint }) : null];
+	}
+
+	const ACCENTS = [
+		["blue", "Blue", "#2563eb"],
+		["green", "Green", "#15803d"],
+		["purple", "Purple", "#7c3aed"],
+		["orange", "Orange", "#c2410c"],
+		["pink", "Pink", "#be185d"],
+		["red", "Red", "#dc2626"],
+	];
+
+	function accentRow() {
+		const wrap = el("div", { class: "swatches", role: "group", "aria-label": "Accent color" });
+		const buttons = ACCENTS.map(([value, name, color]) => {
+			const b = el("button", {
+				type: "button",
+				class: "swatch",
+				title: name,
+				"aria-label": name,
+				"aria-pressed": String(Settings.get("accent") === value),
+				style: "background:" + color,
+				onclick: () => {
+					Settings.set("accent", value);
+					buttons.forEach((x, i) => x.setAttribute("aria-pressed", String(ACCENTS[i][0] === value)));
+				},
+			});
+			return b;
+		});
+		wrap.append(...buttons);
+		return el("div", { class: "row" }, el("span", { text: "Accent color" }), wrap);
+	}
+
+	function zoomRow() {
+		const out = el("output", { "aria-live": "polite" });
+		const show = () => (out.textContent = Settings.get("zoom") + "%");
+		const step = (dir) => {
+			const zs = Settings.zooms;
+			const i = zs.indexOf(Settings.get("zoom"));
+			const next = zs[Math.min(zs.length - 1, Math.max(0, i + dir))];
+			Settings.set("zoom", next);
+			show();
+		};
+		show();
+		const id = uid();
+		return [
+			el(
+				"div",
+				{ class: "row" },
+				el("span", { id, text: "Page zoom" }),
+				el(
+					"div",
+					{ class: "stepper", role: "group", "aria-labelledby": id },
+					el("button", { type: "button", "aria-label": "Zoom out", text: "−", onclick: () => step(-1) }),
+					out,
+					el("button", { type: "button", "aria-label": "Zoom in", text: "+", onclick: () => step(1) }),
+					el("button", {
+						type: "button",
+						text: "Reset",
+						"aria-label": "Reset zoom to 100%",
+						onclick: () => {
+							Settings.set("zoom", 100);
+							show();
+						},
+					})
+				)
+			),
+			el("p", { class: "hint", text: "Makes the websites you visit bigger or smaller." }),
+		];
+	}
+
+	function renderSettings() {
+		const engines = Object.entries(Settings.engines).map(([k, v]) => [k, v.name]);
+		body.append(
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Appearance" }),
+				selectRow("Theme", "theme", [["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]),
+				accentRow(),
+				selectRow("Home background", "bg", [["plain", "Plain"], ["gradient", "Soft gradient"], ["aurora", "Aurora"], ["grid", "Grid"]]),
+				selectRow("Clock on home page", "clock", [["off", "Off"], ["12", "12-hour"], ["24", "24-hour"]]),
+				toggleRow("Show favorites on home page", "showFavs")
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Search" }),
+				selectRow("Search engine", "engine", engines, "Used when you type words instead of a website address.")
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Accessibility" }),
+				selectRow("Text size", "textSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"], ["xlarge", "Extra large"]], "Changes Moox Proxy's own text. Use page zoom for websites."),
+				toggleRow("High contrast", "highContrast"),
+				toggleRow("Easy-to-read font", "readableFont"),
+				toggleRow("Reduce motion", "reduceMotion"),
+				zoomRow()
+			),
+			el("div", { class: "btn-row" }, el("button", {
+				type: "button",
+				class: "btn",
+				text: "Reset settings",
+				onclick: () => {
+					Settings.reset();
+					render();
+				},
+			}))
+		);
+	}
+
+	// ---------- More tab ----------
+	function download(name, text) {
+		const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+		const a = el("a", { href: url, download: name });
+		a.addEventListener("click", (e) => e.stopPropagation()); // don't count as a click outside the menu
+		document.body.append(a);
+		a.click();
+		a.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	}
+
+	async function importFile(file) {
+		if (!file) return;
+		if (file.size > 2 * 1024 * 1024) return say("That file is too big to be a Moox backup.");
+		let data;
+		try {
+			data = JSON.parse(await file.text());
+		} catch {
+			return say("That file isn't a valid backup.");
+		}
+		if (!data || data.app !== "moox-proxy") return say("That file isn't a Moox Proxy backup.");
+		const added = Store.importData(data);
+		Settings.importSettings(data.settings);
+		ctx.onDataChange();
+		say(`Imported ${added.favorites} favorite(s) and ${added.history} history item(s), plus your settings.`);
+	}
+
+	function renderMore() {
+		const fileInput = el("input", { type: "file", accept: "application/json,.json", hidden: true, "aria-label": "Choose a backup file" });
+		fileInput.addEventListener("change", () => {
+			importFile(fileInput.files[0]);
+			fileInput.value = "";
+		});
+
+		const keys = [
+			["Focus the address bar", "/"],
+			["Open or close this menu", "M"],
+			["Go to the home page", "H"],
+			["Close the menu", "Esc"],
+		];
+
+		body.append(
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Backup" }),
+				el("p", { class: "hint", text: "Your favorites, history and settings live in this browser. Export them to keep a copy or move to another device." }),
+				el(
+					"div",
+					{ class: "btn-row" },
+					el("button", {
+						type: "button",
+						class: "btn primary",
+						text: "Export my data",
+						onclick: () => {
+							const data = { app: "moox-proxy", version: 1, exported: new Date().toISOString(), settings: Settings.exportSettings(), ...Store.exportData() };
+							download("moox-backup.json", JSON.stringify(data, null, 2));
+							say("Backup downloaded.");
+						},
+					}),
+					el("button", { type: "button", class: "btn", text: "Import…", onclick: () => fileInput.click() }),
+					fileInput
+				)
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Keyboard shortcuts" }),
+				el("p", { class: "hint", text: "Work when you're not typing in a box. While a website has focus, click the bar at the top first." }),
+				el("ul", { class: "keys" }, keys.map(([what, key]) => el("li", {}, el("span", { text: what }), el("kbd", { text: key }))))
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Account and data" }),
+				el(
+					"div",
+					{ class: "btn-row" },
+					el("button", {
+						type: "button",
+						class: "btn",
+						text: "Log out",
+						onclick: () => {
+							// Clears the login cookie, then reloads. Harmless if no password is set.
+							fetch("/logout", { redirect: "manual", credentials: "same-origin" })
+								.catch(() => {})
+								.finally(() => (location.href = "/"));
+						},
+					}),
+					el("button", {
+						type: "button",
+						class: "btn danger",
+						text: "Delete all my data",
+						onclick: () => {
+							if (!confirm("Delete all favorites, history and settings saved in this browser? This can't be undone.")) return;
+							Store.clearAll();
+							Settings.reset();
+							ctx.onDataChange();
+							say("All saved data deleted.");
+						},
+					})
+				)
+			),
+			el("p", { class: "muted", text: "Moox Proxy · powered by Scramjet" }),
+			el("p", { id: "menu-msg", class: "", role: "status", "aria-live": "polite" })
+		);
+	}
+
+	// ---------- Shell ----------
+	function render() {
+		rowId = 0;
+		for (const t of tabs) {
+			const on = t.dataset.tab === tab;
+			t.setAttribute("aria-selected", String(on));
+			t.tabIndex = on ? 0 : -1;
+		}
+		body.setAttribute("aria-labelledby", "tab-" + tab);
+		body.textContent = "";
+		if (tab === "history") renderHistory();
+		else if (tab === "settings") renderSettings();
+		else renderMore();
+	}
+
+	function setExpanded(on) {
+		for (const b of toggleButtons) b.setAttribute("aria-expanded", String(on));
+	}
+
+	function open(which) {
+		if (which) tab = which;
+		lastFocus = document.activeElement;
+		menu.hidden = false;
+		render();
+		setExpanded(true);
+		const active = tabs.find((t) => t.dataset.tab === tab);
+		if (active) active.focus();
+	}
+
+	function close() {
+		if (menu.hidden) return;
+		const hadFocus = menu.contains(document.activeElement);
+		menu.hidden = true;
+		setExpanded(false);
+		if (hadFocus && lastFocus && document.contains(lastFocus)) lastFocus.focus();
+	}
+
+	function init(context) {
+		ctx = context;
+		for (const t of tabs) {
+			t.addEventListener("click", () => {
+				tab = t.dataset.tab;
+				render();
+			});
+			// Left/Right arrows move between tabs
+			t.addEventListener("keydown", (e) => {
+				if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+				const i = tabs.indexOf(t);
+				const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+				tab = next.dataset.tab;
+				render();
+				next.focus();
+				e.preventDefault();
+			});
+		}
+		for (const b of toggleButtons) {
+			b.addEventListener("click", (e) => {
+				e.stopPropagation();
+				if (menu.hidden) open();
+				else close();
+			});
+		}
+		// Click anywhere outside the menu to close it.
+		// (composedPath is fixed when the click starts, so this still works when the
+		// clicked button was removed from the page by the click itself.)
+		document.addEventListener("click", (e) => {
+			if (!menu.hidden && !e.composedPath().includes(menu)) close();
+		});
+		// Clicks inside the website (an iframe) never reach this page, but they do
+		// move focus into it, so close the menu when that happens too.
+		window.addEventListener("blur", () => {
+			const a = document.activeElement;
+			if (!menu.hidden && a && a.tagName === "IFRAME") close();
+		});
+	}
+
+	return {
+		init,
+		open,
+		close,
+		toggle: () => (menu.hidden ? open() : close()),
+		isOpen: () => !menu.hidden,
+		refreshHistory() {
+			if (!menu.hidden && tab === "history") render();
+		},
+	};
+})();
