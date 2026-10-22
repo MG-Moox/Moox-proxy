@@ -118,6 +118,11 @@ html[data-contrast="high"] .tile { border-color: var(--border); }
 .tile-open { display: flex; flex-direction: column; align-items: center; gap: .45rem; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; }
 .tile .name { width: 100%; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile.add .ico { background: transparent; border: 2px dashed var(--muted); color: var(--muted); font-size: 1.5rem; }
+.tile .edit { position: absolute; top: 4px; left: 4px; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: 50%; background: rgba(127, 127, 127, .4); color: inherit; font-size: .8rem; line-height: 1; display: none; }
+.tile:hover .edit, .tile:focus-within .edit { display: block; }
+@media (hover: none) { .tile .edit { display: block; opacity: .75; } }
+.tile.dragging { opacity: .4; }
+.tile.over { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .tile .x { position: absolute; top: 4px; right: 4px; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: 50%; background: rgba(127, 127, 127, .4); color: inherit; font-size: .9rem; line-height: 1; display: none; }
 .tile:hover .x, .tile:focus-within .x { display: block; }
 @media (hover: none) { .tile .x { display: block; opacity: .75; } }
@@ -128,8 +133,28 @@ html[data-contrast="high"] .tile { border-color: var(--border); }
 .ico.sm { width: 1.8rem; height: 1.8rem; border-radius: 7px; font-size: .85rem; }
 .ico.sm img { padding: 4px; }
 
-/* ============ Browser bar ============ */
-#bar { position: fixed; top: 0; left: 0; right: 0; height: 3rem; z-index: 20; display: flex; align-items: center; gap: .25rem; padding: 0 .5rem; background: var(--bar-bg); border-bottom: var(--bw) solid var(--border); }
+/* ============ Tabs and browser bar ============
+   Two layout variables drive every fixed element: the tab strip height
+   (once a tab exists) and the bar height (while a page is open). */
+body { --tabs-h: 0px; --bar-h: 0px; --z: 1; }
+body.has-tabs { --tabs-h: 2.4rem; }
+body.browsing { --bar-h: 3rem; }
+
+#tabs { position: fixed; top: 0; left: 0; right: 0; height: 2.4rem; z-index: 21; display: flex; align-items: flex-end; gap: .15rem; padding: 0 .4rem; background: color-mix(in srgb, var(--bar-bg) 88%, #000); border-bottom: var(--bw) solid var(--border); }
+html[data-contrast="high"] #tabs { background: var(--bg); }
+#tab-list { display: flex; align-items: flex-end; gap: .15rem; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
+#tab-list::-webkit-scrollbar { display: none; }
+.tabitem { display: flex; align-items: center; flex: 0 1 12rem; min-width: 4.5rem; max-width: 13rem; height: 2.05rem; border-radius: 8px 8px 0 0; border: var(--bw) solid transparent; border-bottom: 0; }
+.tabitem:hover { background: var(--hover); }
+.tabitem.active { background: var(--bar-bg); border-color: var(--border); }
+.tabbtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: .45rem; height: 100%; padding: 0 .35rem 0 .5rem; border: 0; background: transparent; color: inherit; text-align: left; font-size: .85rem; }
+.tabbtn .tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabx { flex: none; width: 1.5rem; height: 1.5rem; margin-right: .2rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; }
+.tabx:hover { background: var(--hover); color: var(--fg); }
+#btn-newtab { flex: none; width: 2rem; height: 2rem; margin-bottom: .1rem; border: 0; border-radius: 8px; background: transparent; color: inherit; font-size: 1.3rem; line-height: 1; }
+#btn-newtab:hover { background: var(--hover); }
+
+#bar { position: fixed; top: var(--tabs-h); left: 0; right: 0; height: 3rem; z-index: 20; display: flex; align-items: center; gap: .25rem; padding: 0 .5rem; background: var(--bar-bg); border-bottom: var(--bw) solid var(--border); }
 #bar button { width: 2.25rem; height: 2.25rem; flex: none; border: 0; border-radius: 6px; background: transparent; font-size: 1.2rem; line-height: 1; color: inherit; }
 #bar button:hover { background: var(--hover); }
 #bar-form { flex: 1; min-width: 0; }
@@ -137,12 +162,38 @@ html[data-contrast="high"] .tile { border-color: var(--border); }
 #btn-fav.on { color: #eab308; }
 html[data-contrast="high"] #btn-fav.on { color: var(--accent); }
 
-#frame { position: fixed; top: 3rem; left: 0; width: 100%; height: calc(100% - 3rem); border: 0; background: #fff; }
+/* One iframe per tab. --z is page zoom: the frame is made 1/z bigger and scaled
+   back down, so it always fills the window exactly. */
+.site-frame { position: fixed; top: calc(var(--tabs-h) + var(--bar-h)); left: 0; width: calc(100% / var(--z)); height: calc((100% - var(--tabs-h) - var(--bar-h)) / var(--z)); transform: scale(var(--z)); transform-origin: 0 0; border: 0; background: #fff; }
 body.browsing { overflow: hidden; }
+body.has-tabs #home { margin-top: calc(var(--tabs-h) + 8vh); }
+body.has-tabs .corner { top: calc(var(--tabs-h) + 12px); }
+
+/* Friendly error / starting-up page, drawn over the site frame */
+#site-error { position: fixed; top: calc(var(--tabs-h) + var(--bar-h)); left: 0; right: 0; bottom: 0; z-index: 12; overflow: auto; padding: 1.5rem 1rem; background: var(--bg); color: var(--fg); }
+.se-card { max-width: 36rem; margin: 6vh auto 0; text-align: center; }
+.se-card h2 { margin: 0 0 .5rem; }
+.se-url { margin: 0 0 1rem; color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+.se-card p { margin: 0 0 1rem; }
+.se-card .btn-row { justify-content: center; margin-bottom: 1.25rem; }
+.se-card details { text-align: left; }
+.se-card summary { cursor: pointer; color: var(--muted); }
+.se-card pre { max-height: 14rem; overflow: auto; margin: .5rem 0; padding: .6rem; border: var(--bw) solid var(--border); border-radius: 8px; font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--input-bg); }
+.se-spin { width: 2rem; height: 2rem; margin: 0 auto 1rem; border: 3px solid var(--hover); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Suggestions dropdown */
+#suggest { position: fixed; z-index: 40; max-height: 22rem; overflow-y: auto; margin: 0; padding: .25rem; list-style: none; text-align: left; border: var(--bw) solid var(--border); border-radius: 12px; background: var(--panel-bg); color: var(--fg); box-shadow: var(--shadow); }
+#suggest li { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border-radius: 8px; cursor: pointer; }
+#suggest li:hover { background: var(--hover); }
+#suggest li[aria-selected="true"] { background: var(--hover); outline: 2px solid var(--focus); outline-offset: -2px; }
+.sug-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug-sub { display: block; font-size: .75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.sug-mag { flex: none; color: var(--muted); }
 
 /* ============ Menu ============ */
-#menu { position: fixed; top: 3.6rem; right: 8px; z-index: 30; width: min(25rem, calc(100% - 16px)); max-height: calc(100% - 4.6rem); display: flex; flex-direction: column; border: var(--bw) solid var(--border); border-radius: 14px; background: var(--panel-bg); color: var(--fg); box-shadow: var(--shadow); overflow: hidden; }
-body:not(.browsing) #menu { top: 4rem; }
+#menu { position: fixed; top: calc(var(--tabs-h) + var(--bar-h) + .6rem); right: 8px; z-index: 30; width: min(25rem, calc(100% - 16px)); max-height: calc(100% - var(--tabs-h) - var(--bar-h) - 1.6rem); display: flex; flex-direction: column; border: var(--bw) solid var(--border); border-radius: 14px; background: var(--panel-bg); color: var(--fg); box-shadow: var(--shadow); overflow: hidden; }
+body:not(.browsing) #menu { top: calc(var(--tabs-h) + 4rem); }
 #menu:not([hidden]) { animation: menu-in .14s ease-out; }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

@@ -29,6 +29,7 @@ const Settings = (() => {
 		readableFont: [true, false],
 		reduceMotion: [true, false],
 		showFavs: [true, false],
+		suggestions: [true, false],
 	};
 
 	const DEFAULTS = {
@@ -43,6 +44,7 @@ const Settings = (() => {
 		readableFont: false,
 		reduceMotion: false,
 		showFavs: true,
+		suggestions: true,
 	};
 
 	const listeners = [];

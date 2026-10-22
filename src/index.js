@@ -13,6 +13,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createAuth } from "./auth.js";
 import { createIcons } from "./icons.js";
+import { createSuggest } from "./suggest.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -50,6 +51,7 @@ Object.assign(wisp.options, {
 // ---------- Auth (login page + cookie, see auth.js) ----------
 const auth = createAuth(PASSWORD);
 const icons = createIcons();
+const suggest = createSuggest();
 
 // ---------- Server ----------
 const fastify = Fastify({
@@ -66,6 +68,14 @@ const fastify = Fastify({
 				// Favicons for the favorites grid.
 				if (req.url.startsWith("/icon?")) {
 					icons.handle(req, res).catch(() => {
+						if (!res.headersSent) res.writeHead(500);
+						res.end();
+					});
+					return;
+				}
+				// Search suggestions for the address box.
+				if (req.url.startsWith("/suggest?")) {
+					suggest.handle(req, res).catch(() => {
 						if (!res.headersSent) res.writeHead(500);
 						res.end();
 					});

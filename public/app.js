@@ -164,6 +164,7 @@ function navigate(tab, url) {
 	tab.starting = false;
 	tab.error = null;
 	activeId = tab.id;
+	homeAddress.value = ""; // the home search box starts fresh next time you're back there
 	tab.frame.go(url);
 	updateView();
 }
@@ -295,7 +296,7 @@ function renderSiteError(tab) {
 	};
 	mk("Try again", () => navigate(tab, tab.url || e.url), true);
 	mk("Go back", () => tab.frame && tab.frame.back());
-	mk("Close page", goHome);
+	mk("Back to home", goHome);
 	card.append(row);
 
 	const details = document.createElement("details");

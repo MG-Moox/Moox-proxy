@@ -190,7 +190,8 @@ const Menu = (() => {
 				"fieldset",
 				{ class: "group" },
 				el("h3", { text: "Search" }),
-				selectRow("Search engine", "engine", engines, "Used when you type words instead of a website address.")
+				selectRow("Search engine", "engine", engines, "Used when you type words instead of a website address."),
+				toggleRow("Search suggestions", "suggestions", "Shows ideas as you type. What you type is sent to DuckDuckGo or Google through your server.")
 			),
 			el(
 				"fieldset",
@@ -251,7 +252,11 @@ const Menu = (() => {
 		const keys = [
 			["Focus the address bar", "/"],
 			["Open or close this menu", "M"],
-			["Go to the home page", "H"],
+			["New tab", "T"],
+			["Close this tab", "W"],
+			["Next / previous tab", "]  ["],
+			["Close the page (home)", "H"],
+			["Move a favorite (when selected)", "Shift + \u2190 \u2192"],
 			["Close the menu", "Esc"],
 		];
 

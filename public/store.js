@@ -43,6 +43,25 @@ const Store = (() => {
 			write(KEY_FAV, list);
 			return true;
 		},
+		renameFavorite(url, title) {
+			const list = read(KEY_FAV);
+			const f = list.find((x) => x.url === url);
+			const name = String(title || "").trim().slice(0, 300);
+			if (!f || !name) return false;
+			f.title = name;
+			write(KEY_FAV, list);
+			return true;
+		},
+		// Moves a favorite so it ends up at position toIndex (0 = first).
+		moveFavorite(url, toIndex) {
+			const list = read(KEY_FAV);
+			const from = list.findIndex((x) => x.url === url);
+			if (from < 0) return false;
+			const [item] = list.splice(from, 1);
+			list.splice(Math.max(0, Math.min(list.length, Number(toIndex) || 0)), 0, item);
+			write(KEY_FAV, list);
+			return true;
+		},
 		removeFavorite(url) {
 			write(KEY_FAV, read(KEY_FAV).filter((f) => f.url !== url));
 		},

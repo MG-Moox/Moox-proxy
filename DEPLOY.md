@@ -40,3 +40,18 @@ Type `p`, press Tab, enter a site (or a search) and press Enter. Chrome asks for
 - Many free hosts forbid open proxies in their terms. A password-protected personal one is much less likely to be flagged.
 - Scramjet is licensed AGPL-3.0, so if you run a modified copy as a public service, keep the source available (this repo being public on GitHub covers that).
 - Check this proxy against your school's or workplace's acceptable-use rules before relying on it.
+
+## What's in it
+
+- **Tabs** (up to 12), with a friendly error page and a quiet auto-retry when the proxy is still warming up.
+- **Favorites** with site icons: drag to reorder, rename with the pencil, Ctrl-click or middle-click for a new tab.
+- **Search suggestions** from your favorites, your history and DuckDuckGo/Google (can be turned off in Settings).
+- **Menu (the three-bar button):** History, Settings (theme, accent, wallpapers, clock, search engine, text size, high contrast, easy-to-read font, reduce motion, page zoom) and More (backup, shortcuts, log out).
+- **Install as an app:** in Chrome, use the install icon in the address bar.
+- **Shortcuts** (when you're not typing): `/` address bar, `M` menu, `T` new tab, `W` close tab, `[` `]` switch tab, `H` close page, `Esc` close menu.
+
+Favorites, history and settings are stored in your browser. Use Menu > More > Export my data to keep a copy.
+
+## Keeping it awake
+
+Add a monitor at uptimerobot.com for `https://YOUR-ADDRESS/health` every 5 minutes. That page needs no login.
