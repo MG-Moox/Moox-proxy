@@ -100,6 +100,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 	const state = {
 		signupMode: ["open", "code", "closed"].includes(defaultSignupMode) ? defaultSignupMode : "open",
 		lockdown: false,
+		announcement: "",
 	};
 	const bannedIps = new Map(); // ip -> reason
 	const sessionCache = new Map(); // hash -> { user|null, exp }
@@ -124,6 +125,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 		for (const r of rows) {
 			if (r.key === "signup_mode" && ["open", "code", "closed"].includes(r.value)) state.signupMode = r.value;
 			if (r.key === "lockdown") state.lockdown = r.value === "1";
+			if (r.key === "announcement") state.announcement = String(r.value || "");
 		}
 		for (const r of (await db.exec("SELECT ip,reason FROM banned_ips")).rows) bannedIps.set(r.ip, r.reason || "");
 		await maintenance();
@@ -398,6 +400,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			resetInSeconds: secondsUntilReset(),
 			limited: !premium && used >= FREE_SECONDS,
 			day: sydneyDay(),
+			announcement: state.announcement,
 		};
 	}
 
@@ -540,6 +543,34 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 		json(res, 200, { ok: true });
 	}
 
+	async function apiLogoutOthers(req, res, user) {
+		const keep = sha256(parseCookies(req).moox_session || "");
+		const r = await db.exec("DELETE FROM sessions WHERE user_id=? AND hash<>?", [user.id, keep]);
+		clearCache();
+		const mine = tracker.list().filter((c) => c.userId === user.id).length;
+		json(res, 200, { ok: true, loggedOut: r.affected, connections: mine });
+	}
+
+	async function apiDeleteAccount(req, res, ip, user) {
+		const body = await readJson(req, 2000);
+		if (limiter.count(`del:${user.id}`, 15 * 60_000) >= 5) return json(res, 429, { error: "Too many attempts. Wait 15 minutes." });
+		const row = await getUserById(user.id);
+		if (!row || !(await verifyPassword(String(body.password || ""), row.pass))) {
+			limiter.hit(`del:${user.id}`, 99, 15 * 60_000);
+			return json(res, 400, { error: "That password is wrong." });
+		}
+		tracker.kickUser(user.id);
+		await db.batch([
+			["DELETE FROM sessions WHERE user_id=?", [user.id]],
+			["DELETE FROM user_data WHERE user_id=?", [user.id]],
+			["DELETE FROM usage WHERE user_id=?", [user.id]],
+			["DELETE FROM users WHERE id=?", [user.id]],
+		]);
+		clearCache();
+		events.log("user_self_deleted", "info", { ip, userId: user.id, username: user.username, detail: "deleted their own account" });
+		json(res, 200, { ok: true }, { "set-cookie": cookieHeader(req, "", 0) });
+	}
+
 	async function apiData(req, res, user) {
 		if (req.method === "GET") {
 			const r = (await db.exec("SELECT json,updated FROM user_data WHERE user_id=?", [user.id])).rows[0];
@@ -627,6 +658,8 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			if (path === "/api/me" && req.method === "GET") return (json(res, 200, await mePayload(user)), null);
 			if (path === "/api/redeem" && req.method === "POST") return (await apiRedeem(req, res, ip, user), null);
 			if (path === "/api/password" && req.method === "POST") return (await apiPassword(req, res, ip, user), null);
+			if (path === "/api/logout-others" && req.method === "POST") return (await apiLogoutOthers(req, res, user), null);
+			if (path === "/api/delete-account" && req.method === "POST") return (await apiDeleteAccount(req, res, ip, user), null);
 			if (path === "/api/data" && (req.method === "GET" || req.method === "PUT")) return (await apiData(req, res, user), null);
 			if (path.startsWith("/api/")) return (json(res, 404, { error: "not found" }), null);
 
@@ -701,6 +734,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 				blockedIps: bannedIps.size,
 				signupMode: state.signupMode,
 				lockdown: state.lockdown,
+				announcement: state.announcement,
 				freeMinutes: Math.round(FREE_SECONDS / 60),
 				uptimeSeconds: Math.round((now - startedAt) / 1000),
 				memoryMb: Math.round(process.memoryUsage().rss / 1048576),
@@ -860,6 +894,24 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			events.log("lockdown", on ? "alert" : "info", { detail: on ? "lockdown ON: all proxy connections closed" : "lockdown off" });
 		},
 		kickAll: () => tracker.kickAll(),
+
+		async setAnnouncement(text) {
+			const t = String(text || "").trim().slice(0, 200);
+			state.announcement = t;
+			await setSetting("announcement", t);
+			events.log("announcement", "info", { detail: t ? "message set: " + t : "message cleared" });
+		},
+
+		// Everything worth keeping if the database were ever lost (no password hashes).
+		async exportAll() {
+			const [users, codes, ips, settings] = await db.batch([
+				["SELECT id,username,created,banned,ban_reason,premium_until,last_login,last_ip,signup_ip FROM users ORDER BY id", []],
+				["SELECT * FROM codes ORDER BY created", []],
+				["SELECT * FROM banned_ips", []],
+				["SELECT * FROM settings", []],
+			]);
+			return { exported: new Date().toISOString(), users: users.rows, codes: codes.rows, blockedIps: ips.rows, settings: settings.rows };
+		},
 	};
 
 	return { init, gate, authorizeUpgrade, tracker, admin, state, flushUsage, clearCache };

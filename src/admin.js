@@ -137,6 +137,16 @@ export function createAdmin({ password, accounts, events }) {
 				await A.setLockdown(Boolean(b.on));
 				return json(res, 200, { ok: true });
 			}
+			case "/admin/api/announcement": {
+				const b = await readJson(req);
+				await A.setAnnouncement(b.text);
+				return json(res, 200, { ok: true });
+			}
+			case "/admin/api/export": {
+				const data = await A.exportAll();
+				audit("downloaded a backup");
+				return json(res, 200, data);
+			}
 			case "/admin/api/kick-all": {
 				const n = A.kickAll();
 				audit(`closed all ${n} proxy connections`);
@@ -413,7 +423,11 @@ function rCodes(body) {
         h("button", { class: "pri", onclick: function () {
           (navigator.clipboard ? navigator.clipboard.writeText(codes.join("\n")) : Promise.reject()).then(function () { alert("Copied!"); }).catch(function () { ta.select(); alert("Press Ctrl+C to copy."); });
         } }, "Copy"),
-        h("span", { class: "mut" }, "Each code works once, on one account. Send it to the person; they enter it on the sign-up page or in their Account tab."))));
+        h("button", { onclick: function () {
+          var links = codes.map(function (c) { return location.origin + "/login?code=" + c; }).join("\n");
+          (navigator.clipboard ? navigator.clipboard.writeText(links) : Promise.reject()).then(function () { alert("Copied! Each link opens the sign-up page with the code already filled in."); }).catch(function () { alert("Couldn't copy automatically."); });
+        } }, codes.length === 1 ? "Copy invite link" : "Copy invite links"),
+        h("span", { class: "mut" }, "Each code works once, on one account. Send the code, or the invite link, which fills it in for them."))));
   }
   function load() {
     api("codes").then(function (d) {
@@ -425,7 +439,7 @@ function rCodes(body) {
           : h("span", { class: "pill good" }, "unused");
         tb.append(h("tr", null, h("td", { class: "mono" }, c.code), h("td", null, c.premium_days ? c.premium_days + " days" : "unlimited"), h("td", null, st),
           h("td", { class: "mut" }, c.note || ""), h("td", { class: "mut" }, fmtTime(c.created)),
-          h("td", null, !c.redeemed_by && !c.revoked ? h("button", { class: "sm", onclick: function () { if (confirm("Cancel this code?")) act(function () { return api("codes/revoke", { code: c.code }); }, load)(); } }, "Cancel") : "")));
+          h("td", null, !c.redeemed_by && !c.revoked ? [h("button", { class: "sm", onclick: function () { var l = location.origin + "/login?code=" + c.code; (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(function () { alert("Invite link copied."); }).catch(function () { prompt("Copy this link:", l); }); } }, "Copy link"), " ", h("button", { class: "sm", onclick: function () { if (confirm("Cancel this code?")) act(function () { return api("codes/revoke", { code: c.code }); }, load)(); } }, "Cancel")] : "")));
       });
       t.append(tb);
       list.replaceChildren(h("div", { class: "card" }, h("h2", null, "All codes"), d.codes.length ? h("div", { class: "tw" }, t) : h("p", { class: "mut" }, "No codes yet. Make one above.")));
@@ -477,6 +491,7 @@ function rControls(body) {
       var modes = [["open", "Open: anyone can sign up"], ["code", "Code only: a code is needed to sign up"], ["closed", "Closed: nobody new can sign up"]];
       var mRow = h("div", { class: "row" });
       modes.forEach(function (m) { mRow.append(h("button", { class: s.signupMode === m[0] ? "on" : "", onclick: act(function () { return api("signup-mode", { mode: m[0] }); }, load) }, m[1])); });
+      var ann = h("input", { placeholder: "Message (optional)", maxlength: "200", style: "flex:1;min-width:14rem", value: s.announcement || "" });
       var ip = h("input", { placeholder: "IP address to block" }), why = h("input", { placeholder: "Reason (optional)" });
       var t = h("table"), tb = h("tbody");
       ips.forEach(function (x) {
@@ -491,7 +506,19 @@ function rControls(body) {
             s.lockdown ? h("button", { class: "pri", onclick: act(function () { return api("lockdown", { on: false }); }, load) }, "Turn lockdown OFF")
               : h("button", { class: "dng", onclick: function () { if (confirm("Cut everyone off?")) act(function () { return api("lockdown", { on: true }); }, load)(); } }, "Lockdown: cut everyone off"),
             h("button", { onclick: function () { if (confirm("Close all current connections? People can reconnect.")) act(function () { return api("kick-all", {}); }, function (d) { alert("Closed " + d.closed + " connections."); })(); } }, "Close all connections"))),
+        h("div", { class: "card" }, h("h2", null, "Message to everyone"),
+          h("p", { class: "mut" }, "Shows as a banner to every signed-in person, e.g. \"Back online at 5pm\". Leave empty and save to remove it."),
+          h("div", { class: "row" }, ann, h("button", { class: "pri", onclick: act(function () { return api("announcement", { text: ann.value }); }, function () { alert("Saved."); }) }, "Save message"))),
         h("div", { class: "card" }, h("h2", null, "Who can sign up"), mRow),
+        h("div", { class: "card" }, h("h2", null, "Backup"),
+          h("p", { class: "mut" }, "Downloads a file with your accounts (no passwords), codes and blocked IPs, in case the database is ever lost."),
+          h("button", { onclick: function () {
+            api("export").then(function (d) {
+              var a = document.createElement("a");
+              a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }));
+              a.download = "moox-admin-backup.json"; document.body.append(a); a.click(); a.remove();
+            }).catch(function (e) { alert(e.message); });
+          } }, "Download backup")),
         h("div", { class: "card" }, h("h2", null, "Blocked IP addresses (" + ips.length + ")"),
           h("div", { class: "row" }, ip, why, h("button", { class: "dng", onclick: act(function () { return api("ip", { action: "ban", ip: ip.value, reason: why.value }); }, load) }, "Block")),
           ips.length ? h("div", { class: "tw" }, t) : h("p", { class: "mut" }, "No blocked addresses.")));

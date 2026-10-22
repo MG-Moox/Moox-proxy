@@ -103,8 +103,37 @@ const Account = (() => {
 		notify();
 	}
 
+	function drawAnnouncement() {
+		const box = document.getElementById("announce-banner");
+		const text = me && me.announcement ? me.announcement : "";
+		let dismissed = "";
+		try {
+			dismissed = localStorage.getItem("moox:announce-dismissed") || "";
+		} catch {}
+		if (!text || dismissed === text) {
+			box.hidden = true;
+			return;
+		}
+		box.replaceChildren(
+			el("span", { text }),
+			el("button", {
+				type: "button",
+				"aria-label": "Dismiss message",
+				text: "\u00d7",
+				onclick: () => {
+					try {
+						localStorage.setItem("moox:announce-dismissed", text);
+					} catch {}
+					box.hidden = true;
+				},
+			})
+		);
+		box.hidden = false;
+	}
+
 	function draw() {
 		if (!me) return;
+		drawAnnouncement();
 		// Low-time banner
 		const left = me.remainingSeconds;
 		if (!me.premium && !me.limited && left != null && left <= 600) {
@@ -245,6 +274,37 @@ const Account = (() => {
 					el("button", { type: "submit", class: "btn", text: "Change password" })
 				),
 				el("p", { class: "hint", text: "There is no password reset, so keep your password safe." })
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Devices and data" }),
+				el(
+					"div",
+					{ class: "btn-row" },
+					el("button", {
+						type: "button",
+						class: "btn",
+						text: "Log out my other devices",
+						onclick: async () => {
+							const r = await post("/api/logout-others", {});
+							say(r.ok ? "Done. Every other device was logged out." : "Something went wrong.");
+						},
+					}),
+					el("button", {
+						type: "button",
+						class: "btn danger",
+						text: "Delete my account",
+						onclick: async () => {
+							if (!confirm("Delete your account and everything saved in it? This can't be undone.")) return;
+							const pw = prompt("Type your password to confirm:");
+							if (!pw) return;
+							const r = await post("/api/delete-account", { password: pw });
+							if (r.ok) location.href = "/login";
+							else say((r.body && r.body.error) || "Something went wrong.");
+						},
+					})
+				)
 			),
 			el("p", { class: "hint", text: "Your favorites, history and settings are saved to your account automatically." })
 		);

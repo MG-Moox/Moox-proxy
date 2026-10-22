@@ -82,7 +82,9 @@ Without the two Turso settings the site keeps using the single `PROXY_PASSWORD` 
 - Users: suspend, log out everywhere, delete, give or remove unlimited time, reset today's time, set a password.
 - Codes: generate codes (unlimited forever, or for 7/30/90/365 days), copy them, see who used each, cancel unused ones.
 - Security: wrong passwords, bot sign-ups, accounts used from many places, tunnel tries without login, and everything you do as admin.
-- Controls: lockdown (cuts everyone off), close all connections, sign-ups open / code only / closed, blocked IP list.
+- Controls: lockdown (cuts everyone off), close all connections, a message banner shown to everyone, sign-ups open / code only / closed, blocked IP list, and a Download backup button.
+- Codes also have **Copy invite link**: a link that opens the sign-up page with the code already filled in.
+- In the app's Account tab people can log out their other devices or delete their own account.
 
 **Limits to know about**
 - The admin page shows what this server can see. It cannot tell if your Render or GitHub account itself is broken into, so use strong passwords and two-step login on those.

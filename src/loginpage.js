@@ -64,7 +64,7 @@ function set(m){
 }
 $("t-login").onclick=function(){set("login")};
 $("t-signup").onclick=function(){set("signup")};
-if(location.hash==="#signup")set("signup");
+
 $("f").onsubmit=function(e){
   e.preventDefault();
   var b=$("go");b.disabled=true;$("err").textContent="";
@@ -78,7 +78,9 @@ $("f").onsubmit=function(e){
    })
    .catch(function(){$("err").textContent="Could not reach the server. Try again.";b.disabled=false;});
 };
-set("login");
+var qc=new URLSearchParams(location.search).get("code");
+if(qc){set("signup");$("c").value=qc.slice(0,25);}
+else set(location.hash==="#signup"?"signup":"login");
 })();
 </script>
 </body></html>`;

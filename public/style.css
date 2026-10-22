@@ -267,3 +267,7 @@ kbd { padding: .05rem .4rem; border: var(--bw) solid var(--border); border-botto
 .limit-form .btn { margin-top: 0; }
 .meter { height: .6rem; border-radius: 99px; background: color-mix(in srgb, var(--fg) 14%, transparent); overflow: hidden; margin: .4rem 0; }
 .meter-fill { height: 100%; background: var(--accent); }
+#announce-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 41; display: flex; align-items: center; gap: .6rem; padding: .45rem .9rem; border-radius: 99px; background: var(--accent); color: var(--accent-fg); font-size: .9rem; text-align: center; box-shadow: var(--shadow); max-width: calc(100% - 24px); }
+#announce-banner[hidden] { display: none; }
+#announce-banner:not([hidden]) + #limit-banner { bottom: 60px; }
+#announce-banner button { border: 0; background: transparent; color: inherit; font-size: 1.1rem; cursor: pointer; padding: 0 .2rem; }
