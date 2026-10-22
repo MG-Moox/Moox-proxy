@@ -216,7 +216,7 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}
 th,td{text-align:left;padding:.45rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
 th{color:var(--mut);font-weight:600;font-size:.8rem}
 .tw{overflow-x:auto}
-.pill{display:inline-block;padding:.05rem .5rem;border-radius:99px;font-size:.75rem;border:1px solid var(--line)}
+.pill{margin:0 .3rem .2rem 0;display:inline-block;padding:.05rem .5rem;border-radius:99px;font-size:.75rem;border:1px solid var(--line)}
 .pill.alert,.pill.bad{color:var(--bad);border-color:var(--bad)}
 .pill.warn{color:var(--warn);border-color:var(--warn)}
 .pill.good{color:var(--good);border-color:var(--good)}
@@ -244,11 +244,14 @@ function h(tag, attrs) {
     else if (v === true) el.setAttribute(k, "");
     else if (v !== false && v != null) el.setAttribute(k, v);
   }
-  for (var i = 2; i < arguments.length; i++) {
-    var c = arguments[i];
-    if (c == null || c === false) continue;
-    el.append(c.nodeType ? c : document.createTextNode(String(c)));
-  }
+  (function add(list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (c == null || c === false) continue;
+      if (Array.isArray(c)) add(c);
+      else el.append(c.nodeType ? c : document.createTextNode(String(c)));
+    }
+  })(Array.prototype.slice.call(arguments, 2));
   return el;
 }
 function api(path, body) {

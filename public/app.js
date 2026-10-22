@@ -597,6 +597,14 @@ Menu.init({
 	},
 });
 
+Account.init({
+	onDataChange: () => {
+		renderFavorites();
+		updateFavButton();
+		Menu.refreshHistory();
+	},
+});
+
 Suggest.init({ makeIcon, hostOf });
 Suggest.attach(homeAddress, (value) => go(value));
 Suggest.attach(barAddress, (value) => go(value));

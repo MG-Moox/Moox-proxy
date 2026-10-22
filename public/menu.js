@@ -327,8 +327,17 @@ const Menu = (() => {
 		);
 	}
 
+	// ---------- Account tab (only when the server has accounts) ----------
+	function renderAccount() {
+		Account.renderTab(body, say);
+		body.append(el("p", { id: "menu-msg", class: "", role: "status", "aria-live": "polite" }));
+	}
+
 	// ---------- Shell ----------
+	const visibleTabs = () => tabs.filter((t) => !t.hidden);
+
 	function render() {
+		if (tab === "account" && !Account.enabled()) tab = "history";
 		rowId = 0;
 		for (const t of tabs) {
 			const on = t.dataset.tab === tab;
@@ -339,6 +348,7 @@ const Menu = (() => {
 		body.textContent = "";
 		if (tab === "history") renderHistory();
 		else if (tab === "settings") renderSettings();
+		else if (tab === "account") renderAccount();
 		else renderMore();
 	}
 
@@ -348,6 +358,7 @@ const Menu = (() => {
 
 	function open(which) {
 		if (which) tab = which;
+		if (tab === "account" && Account.enabled()) Account.refresh().then(() => !menu.hidden && tab === "account" && render());
 		lastFocus = document.activeElement;
 		menu.hidden = false;
 		render();
@@ -374,8 +385,9 @@ const Menu = (() => {
 			// Left/Right arrows move between tabs
 			t.addEventListener("keydown", (e) => {
 				if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-				const i = tabs.indexOf(t);
-				const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+				const vis = visibleTabs();
+				const i = vis.indexOf(t);
+				const next = vis[(i + (e.key === "ArrowRight" ? 1 : vis.length - 1)) % vis.length];
 				tab = next.dataset.tab;
 				render();
 				next.focus();

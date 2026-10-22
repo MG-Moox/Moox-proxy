@@ -253,3 +253,17 @@ kbd { padding: .05rem .4rem; border: var(--bw) solid var(--border); border-botto
 .item .u { font-size: .75rem; color: var(--muted); }
 .del { width: 1.8rem; height: 1.8rem; flex: none; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 1rem; }
 .del:hover { background: var(--hover); }
+
+/* ---------- Accounts ---------- */
+#limit-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 40; padding: .5rem .9rem; border-radius: 99px; background: var(--accent); color: var(--accent-fg); font-size: .9rem; box-shadow: var(--shadow); max-width: calc(100% - 24px); text-align: center; }
+#limit-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px); }
+#limit-overlay[hidden], #limit-banner[hidden] { display: none; }
+.limit-card { width: min(26rem, 100%); padding: 1.4rem; border: var(--bw) solid var(--border); border-radius: 14px; background: var(--panel-bg); text-align: center; box-shadow: var(--shadow); }
+.limit-card h2 { margin-top: 0; }
+.limit-form, .stack { display: flex; gap: .5rem; }
+.stack { flex-direction: column; }
+.limit-form input, .stack input, #menu-body form.btn-row input { flex: 1; min-width: 0; padding: .55rem; border: var(--bw) solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--fg); font-size: 1rem; }
+.limit-card .btn { margin-top: .6rem; }
+.limit-form .btn { margin-top: 0; }
+.meter { height: .6rem; border-radius: 99px; background: color-mix(in srgb, var(--fg) 14%, transparent); overflow: hidden; margin: .4rem 0; }
+.meter-fill { height: 100%; background: var(--accent); }

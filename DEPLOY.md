@@ -52,6 +52,44 @@ Type `p`, press Tab, enter a site (or a search) and press Enter. Chrome asks for
 
 Favorites, history and settings are stored in your browser. Use Menu > More > Export my data to keep a copy.
 
+## Accounts, daily limit, unlock codes and the admin page
+
+Moox can run with accounts. It switches on automatically when these settings exist on Render (Service > Environment):
+
+| Name | Value |
+| --- | --- |
+| `TURSO_DATABASE_URL` | the `libsql://...` address of your free Turso database |
+| `TURSO_AUTH_TOKEN` | the token for that database |
+| `ADMIN_PASSWORD` | a password only you know, 10+ characters (opens `/admin`) |
+| `SIGNUP_MODE` | optional: `open` (default), `code` or `closed`. Also changeable in the admin page |
+| `FREE_MINUTES` | optional: free minutes per day (default 60) |
+
+Without the two Turso settings the site keeps using the single `PROXY_PASSWORD` login. With them, `PROXY_PASSWORD` is no longer used.
+
+**How it works**
+- Anyone can sign up (unless you change that). Free accounts get 60 minutes a day of active browsing. It resets at midnight Sydney time. Time only counts while data is actually moving, not while a page sits idle.
+- An unlock code makes one account unlimited. Each code works once, ever, on one account only.
+- Favorites, history and settings are saved to the account and follow you between devices.
+- There is no password reset (no email). You can set a new password for someone in the admin page.
+
+**Making a Turso database**
+1. turso.tech > sign up (a GitHub login works) > Create Database, name it `moox`, pick Singapore or Sydney.
+2. Open the database: copy its URL (`libsql://...`) and use Generate Token to make a token. Keep both private.
+
+**The admin page** is `https://YOUR-ADDRESS/admin`.
+- Overview: people online, sign-ups, failed logins, alerts.
+- Live: every connection with its account and IP address; Terminate or Block IP.
+- Users: suspend, log out everywhere, delete, give or remove unlimited time, reset today's time, set a password.
+- Codes: generate codes (unlimited forever, or for 7/30/90/365 days), copy them, see who used each, cancel unused ones.
+- Security: wrong passwords, bot sign-ups, accounts used from many places, tunnel tries without login, and everything you do as admin.
+- Controls: lockdown (cuts everyone off), close all connections, sign-ups open / code only / closed, blocked IP list.
+
+**Limits to know about**
+- The admin page shows what this server can see. It cannot tell if your Render or GitHub account itself is broken into, so use strong passwords and two-step login on those.
+- IP addresses come from Render's headers. A determined person can use many IPs, so IP blocks slow people down rather than stop them.
+- Anyone can still make many free accounts. If that happens, set sign-ups to "code only" in Controls.
+- The free Render plan sleeps when idle; use the UptimeRobot step below.
+
 ## Keeping it awake
 
 Add a monitor at uptimerobot.com for `https://YOUR-ADDRESS/health` every 5 minutes. That page needs no login.
