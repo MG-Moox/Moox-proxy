@@ -9,11 +9,21 @@
 //   PORT            port to listen on (default 8080)
 //   PROXY_PASSWORD  if set, require a login (cookie) for the site AND the Wisp
 //                   endpoint. Strongly recommended when public.
+//   TURSO_DATABASE_URL, TURSO_AUTH_TOKEN
+//                   turn on ACCOUNTS (sign-up, daily limit, codes, admin page).
+//                   When set, PROXY_PASSWORD is not used.
+//   ADMIN_PASSWORD  password for /admin (10+ characters). Admin is off if unset.
+//   SIGNUP_MODE     open | code | closed (default open; changeable in /admin)
+//   FREE_MINUTES    free minutes per day (default 60)
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createAuth } from "./auth.js";
 import { createIcons } from "./icons.js";
 import { createSuggest } from "./suggest.js";
+import { createDb } from "./db.js";
+import { createEvents } from "./security.js";
+import { createAccounts } from "./accounts.js";
+import { createAdmin } from "./admin.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -53,6 +63,38 @@ const auth = createAuth(PASSWORD);
 const icons = createIcons();
 const suggest = createSuggest();
 
+// ---------- Accounts (optional) ----------
+const ACCOUNTS_ON = Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
+let db = null;
+const events = createEvents(() => db);
+let accounts = null;
+let admin = null;
+if (ACCOUNTS_ON) {
+	db = createDb({ url: process.env.TURSO_DATABASE_URL, token: process.env.TURSO_AUTH_TOKEN });
+	accounts = createAccounts({
+		db,
+		events,
+		freeMinutes: parseFloat(process.env.FREE_MINUTES || "60") || 60,
+		defaultSignupMode: process.env.SIGNUP_MODE || "open",
+	});
+	admin = createAdmin({ password: process.env.ADMIN_PASSWORD || "", accounts, events });
+}
+
+const fail500 = (res) => () => {
+	if (!res.headersSent) res.writeHead(500);
+	res.end();
+};
+
+// Everything after login: favicons, suggestions, then the static site.
+function serve(req, res, handler) {
+	if (req.url.startsWith("/icon?")) return void icons.handle(req, res).catch(fail500(res));
+	if (req.url.startsWith("/suggest?")) return void suggest.handle(req, res).catch(fail500(res));
+	// Scramjet needs cross-origin isolation.
+	res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+	res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+	handler(req, res);
+}
+
 // ---------- Server ----------
 const fastify = Fastify({
 	serverFactory: (handler) =>
@@ -63,36 +105,32 @@ const fastify = Fastify({
 					res.writeHead(200, { "content-type": "text/plain" });
 					return res.end("ok");
 				}
+				if (ACCOUNTS_ON) {
+					if (admin.handle(req, res)) return;
+					accounts
+						.gate(req, res)
+						.then((user) => {
+							if (user) serve(req, res, handler);
+						})
+						.catch(fail500(res));
+					return;
+				}
 				// Serves /login and /logout, and redirects or rejects anyone not logged in.
 				if (auth.handle(req, res)) return;
-				// Favicons for the favorites grid.
-				if (req.url.startsWith("/icon?")) {
-					icons.handle(req, res).catch(() => {
-						if (!res.headersSent) res.writeHead(500);
-						res.end();
-					});
-					return;
-				}
-				// Search suggestions for the address box.
-				if (req.url.startsWith("/suggest?")) {
-					suggest.handle(req, res).catch(() => {
-						if (!res.headersSent) res.writeHead(500);
-						res.end();
-					});
-					return;
-				}
-				// Scramjet needs cross-origin isolation.
-				res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-				res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-				handler(req, res);
+				serve(req, res, handler);
 			})
-			.on("upgrade", (req, socket, head) => {
-				if (!auth.isAuthorized(req)) {
-					socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
-					return;
+			.on("upgrade", async (req, socket, head) => {
+				if (!req.url.endsWith("/wisp/")) return socket.end();
+				if (!ACCOUNTS_ON) {
+					if (!auth.isAuthorized(req)) return socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
+					return wisp.routeRequest(req, socket, head);
 				}
-				if (req.url.endsWith("/wisp/")) wisp.routeRequest(req, socket, head);
-				else socket.end();
+				socket.on("error", () => {});
+				const r = await accounts.authorizeUpgrade(req);
+				if (socket.destroyed) return;
+				if (!r.ok) return socket.end(`HTTP/1.1 ${r.status} Refused\r\nconnection: close\r\n\r\n`);
+				accounts.tracker.register(r.user, r.ip, socket);
+				wisp.routeRequest(req, socket, head);
 			}),
 });
 
@@ -115,7 +153,16 @@ process.on("SIGTERM", shutdown);
 let port = parseInt(process.env.PORT || "", 10);
 if (Number.isNaN(port)) port = 8080;
 
-fastify.listen({ port, host: "0.0.0.0" }).then(() => {
+(async () => {
+	if (ACCOUNTS_ON) {
+		await accounts.init(); // creates the tables on first run
+		console.log("Accounts: ON (database connected)");
+		if (!admin.enabled) console.warn("ADMIN_PASSWORD is not set (or shorter than 10 characters): the admin page is OFF.");
+	}
+	await fastify.listen({ port, host: "0.0.0.0" });
 	console.log(`Moox Proxy (Scramjet) running at http://localhost:${port}`);
-	if (!PASSWORD) console.warn("WARNING: PROXY_PASSWORD is not set. Do not expose this publicly.");
+	if (!ACCOUNTS_ON && !PASSWORD) console.warn("WARNING: PROXY_PASSWORD is not set. Do not expose this publicly.");
+})().catch((e) => {
+	console.error("Failed to start:", e && e.message);
+	process.exit(1);
 });

@@ -15,13 +15,49 @@ const Store = (() => {
 			return [];
 		}
 	}
+	const subs = [];
 	function write(key, val) {
 		try {
 			localStorage.setItem(key, JSON.stringify(val));
 		} catch {}
+		for (const fn of subs) {
+			try {
+				fn();
+			} catch {}
+		}
 	}
 
+	// Only plain web links with short text are accepted from the server.
+	const isWebUrl = (u) => {
+		if (typeof u !== "string" || u.length > 2048) return false;
+		try {
+			return /^https?:$/.test(new URL(u).protocol);
+		} catch {
+			return false;
+		}
+	};
+
 	return {
+		// Called after any change (used by account.js to sync to the server).
+		onChange: (fn) => subs.push(fn),
+		// Replace everything with data from the server (validated).
+		setAll(data) {
+			const favs = (Array.isArray(data && data.favorites) ? data.favorites : [])
+				.filter((f) => f && isWebUrl(f.url))
+				.slice(0, 500)
+				.map((f) => ({ url: f.url, title: String(f.title || f.url).slice(0, 300), added: Number(f.added) || Date.now() }));
+			const hist = (Array.isArray(data && data.history) ? data.history : [])
+				.filter((h) => h && isWebUrl(h.url))
+				.slice(0, MAX_HIST)
+				.map((h) => ({
+					id: typeof h.id === "string" && h.id.length <= 40 ? h.id : Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+					url: h.url,
+					title: String(h.title || h.url).slice(0, 300),
+					time: Number(h.time) || Date.now(),
+				}));
+			write(KEY_FAV, favs);
+			write(KEY_HIST, hist);
+		},
 		favorites: () => read(KEY_FAV),
 		history: () => read(KEY_HIST),
 		isFavorite: (url) => read(KEY_FAV).some((f) => f.url === url),
