@@ -39,12 +39,17 @@ const Settings = (() => {
 		greeting: [true, false],
 		quickLinks: [true, false],
 		tools: [true, false],
+		recent: [true, false],
+		tabTheme: ["auto", "ocean", "sunset", "forest", "grape", "rose", "mint", "gold", "midnight", "graphite", "custom"],
+		tabStyle: ["classic", "pill", "line"],
+		tabSiteColor: [true, false],
 	};
 
 	// Free-text settings: checked with a function instead of a list.
 	const TEXT = {
 		userName: (v) => typeof v === "string" && v.length <= 30,
 		weatherCity: (v) => typeof v === "string" && v.length <= 60,
+		tabCustom: (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v),
 		accentCustom: (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v),
 	};
 
@@ -70,6 +75,11 @@ const Settings = (() => {
 		greeting: true,
 		quickLinks: true,
 		tools: true,
+		recent: true,
+		tabTheme: "auto",
+		tabStyle: "classic",
+		tabSiteColor: true,
+		tabCustom: "#334155",
 		userName: "",
 		weatherCity: "",
 		accentCustom: "#2563eb",
@@ -116,6 +126,18 @@ const Settings = (() => {
 		root.dataset.corners = current.corners;
 		root.dataset.tiles = current.tileStyle;
 		root.dataset.tilesize = current.tileSize;
+		root.dataset.tabtheme = current.tabTheme;
+		root.dataset.tabstyle = current.tabStyle;
+		root.dataset.tabsite = current.tabSiteColor ? "on" : "off";
+		if (current.tabTheme === "custom") {
+			const c = current.tabCustom, n = parseInt(c.slice(1), 16);
+			const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+			root.style.setProperty("--tabs-bg", c);
+			root.style.setProperty("--tabs-fg", lum > 0.6 ? "#111" : "#fff");
+		} else {
+			root.style.removeProperty("--tabs-bg");
+			root.style.removeProperty("--tabs-fg");
+		}
 		root.style.setProperty("--dim", String(current.bgDim / 100));
 		// Custom accent colour: set the colour and a readable text colour for buttons.
 		if (current.accent === "custom") {

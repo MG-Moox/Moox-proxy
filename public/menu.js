@@ -114,6 +114,13 @@ const Menu = (() => {
 		["red", "Red", "#dc2626"],
 	];
 
+	function tabColorRow() {
+		const id = uid();
+		const input = el("input", { type: "color", id, value: Settings.get("tabCustom") });
+		input.addEventListener("input", () => Settings.set("tabCustom", input.value));
+		return el("div", { class: "row" }, el("label", { for: id, text: "Pick a tab bar color" }), input);
+	}
+
 	function accentRow() {
 		const wrap = el("div", { class: "swatches", role: "group", "aria-label": "Accent color" });
 		const buttons = ACCENTS.map(([value, name, color]) => {
@@ -283,6 +290,10 @@ const Menu = (() => {
 				Settings.get("bg") === "custom" ? selectRow("Dim my picture", "bgDim", [[0, "None"], [20, "A little"], [40, "Medium"], [60, "A lot"]], "Makes text easier to read on bright pictures.") : null,
 				selectRow("Font", "fontStyle", [["system", "Standard"], ["serif", "Serif"], ["mono", "Monospace"], ["rounded", "Rounded"]]),
 				selectRow("Corners", "corners", [["sharp", "Sharp"], ["normal", "Normal"], ["round", "Very round"]]),
+				selectRow("Tab bar colors", "tabTheme", [["auto", "Match theme"], ["ocean", "Ocean"], ["sunset", "Sunset"], ["forest", "Forest"], ["grape", "Grape"], ["rose", "Rose"], ["mint", "Mint"], ["gold", "Gold"], ["midnight", "Midnight"], ["graphite", "Graphite"], ["custom", "My color"]]),
+				Settings.get("tabTheme") === "custom" ? tabColorRow() : null,
+				selectRow("Tab shape", "tabStyle", [["classic", "Classic"], ["pill", "Pills"], ["line", "Underline"]]),
+				toggleRow("Color stripe on each tab", "tabSiteColor", "Gives every website its own color so tabs are easy to tell apart."),
 				selectRow("Tile style", "tileStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"]]),
 				selectRow("Tile size", "tileSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"]])
 			),
@@ -294,6 +305,7 @@ const Menu = (() => {
 				toggleRow("Greeting", "greeting"),
 				textRow("Name for the greeting", "userName", "Your name (optional)", 30),
 				toggleRow("Quick links (YouTube, Google...)", "quickLinks"),
+				toggleRow("Recent sites and reopen session", "recent"),
 				toggleRow("Tools (calculator, timer, notes, weather)", "tools"),
 				toggleRow("Favorites", "showFavs"),
 				textRow("Weather city", "weatherCity", "e.g. Sydney", 60),
@@ -553,6 +565,13 @@ const Menu = (() => {
 		close,
 		toggle: () => (menu.hidden ? open() : close()),
 		isOpen: () => !menu.hidden,
+		rerender() {
+			if (!menu.hidden && tab === "settings") {
+				const y = body.scrollTop;
+				render();
+				body.scrollTop = y;
+			}
+		},
 		refreshHistory() {
 			if (!menu.hidden && tab === "history") render();
 		},

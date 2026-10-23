@@ -1,6 +1,6 @@
 {
 	"name": "moox-proxy",
-	"version": "2.3.0",
+	"version": "2.4.0",
 	"description": "Moox Proxy, a password-protected web proxy powered by Scramjet",
 	"type": "module",
 	"main": "src/index.js",

@@ -62,10 +62,18 @@ function newBlankTab() {
 	homeAddress.focus();
 }
 
+const closedTabs = [];
+function reopenClosedTab() {
+	const u = closedTabs.pop();
+	if (u) go(u, { newTab: true });
+}
+
 function closeTab(id) {
 	const i = tabs.findIndex((t) => t.id === id);
 	if (i < 0) return;
 	const [tab] = tabs.splice(i, 1);
+	if (tab.url) closedTabs.push(tab.url);
+	if (closedTabs.length > 10) closedTabs.shift();
 	if (tab.frame) tab.frame.frame.remove();
 	if (activeId === id) activeId = tabs.length ? tabs[Math.min(i, tabs.length - 1)].id : null;
 	Menu.close();
@@ -328,6 +336,11 @@ function renderTabs() {
 		const isActive = t.id === activeId;
 		const item = document.createElement("div");
 		item.className = "tabitem" + (isActive ? " active" : "");
+		if (t.url) {
+			let hash = 0;
+			for (const ch of hostOf(t.url).replace(/^www\./, "")) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
+			item.style.setProperty("--site", "hsl(" + hash + " 70% 55%)");
+		}
 
 		const btn = document.createElement("button");
 		btn.type = "button";
@@ -426,7 +439,7 @@ function renderRecent() {
 		if (items.length >= 6) break;
 	}
 	const sess = tabs.length ? [] : lastSession();
-	box.hidden = !items.length && !sess.length;
+	box.hidden = !Settings.get("recent") || (!items.length && !sess.length);
 	if (sess.length) {
 		const b = document.createElement("button");
 		b.type = "button";
@@ -640,6 +653,9 @@ Settings.onChange((key) => {
 	if (key === "engine" || key === "*") updatePlaceholder();
 	if (key === "clock" || key === "*") renderClock();
 	if (key === "showFavs" || key === "*") renderFavorites();
+	if (key === "recent" || key === "*") renderRecent();
+	if (key === "tabTheme") Menu.rerender();
+	if (key === "tabSiteColor" || key === "*") renderTabs();
 });
 
 // ---------- Wiring ----------
@@ -697,6 +713,7 @@ Apps.init({
 	openTool: (n) => Home.openByName(n),
 	openMenu: (n) => Menu.open(n),
 	newTab: newBlankTab,
+	reopenClosed: reopenClosedTab,
 });
 Backgrounds.init();
 Account.onChange(() => Home.renderGreeting());
@@ -708,6 +725,10 @@ Suggest.attach(barAddress, (value) => go(value));
 // Keyboard shortcuts (only when you're not typing in a box)
 document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape") return Menu.close();
+	if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "t") {
+		event.preventDefault();
+		return reopenClosedTab();
+	}
 	if (event.ctrlKey || event.metaKey || event.altKey) return;
 	if (Apps.isOpen()) return;
 	if (Home.toolOpen()) return; // keys belong to the calculator, timer or notes
@@ -743,6 +764,7 @@ document.addEventListener("keydown", (event) => {
 
 updatePlaceholder();
 renderFavorites();
+renderRecent();
 renderClock();
 
 // Register the service worker right away (not just on the first search) so the

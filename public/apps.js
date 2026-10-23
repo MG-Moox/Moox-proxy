@@ -137,6 +137,7 @@ const Apps = (() => {
 			["👤", "Account & time left", () => ctx.openMenu("account")],
 			["🕘", "History", () => ctx.openMenu("history")],
 			["➕", "New tab", () => ctx.newTab()],
+			["↩", "Reopen closed tab", () => ctx.reopenClosed && ctx.reopenClosed()],
 		];
 		return a.map(([icon, label, run]) => ({ icon, label, run, kind: "Action" }));
 	}

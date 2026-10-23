@@ -1,5 +1,16 @@
 [
 	{
+		"version": "2.4.0",
+		"date": "2026-10-24",
+		"changes": [
+			"Tab bar colors: Ocean, Sunset, Forest, Grape, Rose, Mint, Gold, Midnight, Graphite or pick your own",
+			"Tab shapes (Classic, Pills, Underline) and a color stripe per website so tabs are easy to tell apart",
+			"New switch to hide the recent sites row and Reopen session button (the Quick links switch hides quick apps)",
+			"Reopen a closed tab with Ctrl+Shift+T or from the Ctrl+K palette",
+			"Polish: smoother hover and press effects, softer shadows, glowing search box, animated menus and thinner scrollbars"
+		]
+	},
+	{
 		"version": "2.3.0",
 		"date": "2026-10-23",
 		"changes": [
