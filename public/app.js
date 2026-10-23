@@ -397,6 +397,14 @@ function applyZoom() {
 // ---------- Favorites grid (home page) ----------
 let dragUrl = null;
 
+// "Edit favorites" (touch screens): shows rename / remove / move buttons on every tile.
+$("fav-edit").addEventListener("click", () => {
+	const on = !$("favs").classList.contains("editing");
+	$("favs").classList.toggle("editing", on);
+	$("fav-edit").setAttribute("aria-pressed", String(on));
+	$("fav-edit").textContent = on ? "Done" : "Edit favorites";
+});
+
 function renderFavorites() {
 	$("favs").hidden = !Settings.get("showFavs");
 	favGrid.textContent = "";
@@ -489,7 +497,25 @@ function renderFavorites() {
 			renderFavorites();
 		});
 
-		tile.append(open, edit, x);
+		// Touch screens can't drag or use Shift+arrows, so they get move buttons.
+		const mover = (dir) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.className = "mv " + (dir < 0 ? "mv-l" : "mv-r");
+			b.textContent = dir < 0 ? "\u25c0" : "\u25b6";
+			b.title = dir < 0 ? "Move earlier" : "Move later";
+			b.setAttribute("aria-label", (dir < 0 ? "Move " : "Move ") + (fav.title || fav.url) + (dir < 0 ? " earlier" : " later"));
+			b.addEventListener("click", () => {
+				const list = Store.favorites();
+				const i = list.findIndex((f) => f.url === fav.url);
+				const j = i + dir;
+				if (j < 0 || j >= list.length) return;
+				Store.moveFavorite(fav.url, j);
+				renderFavorites();
+			});
+			return b;
+		};
+		tile.append(open, edit, x, mover(-1), mover(1));
 		favGrid.appendChild(tile);
 	}
 
@@ -605,6 +631,10 @@ Account.init({
 	},
 });
 
+Home.init({ go, makeIcon, hostOf });
+Backgrounds.init();
+Account.onChange(() => Home.renderGreeting());
+
 Suggest.init({ makeIcon, hostOf });
 Suggest.attach(homeAddress, (value) => go(value));
 Suggest.attach(barAddress, (value) => go(value));
@@ -613,6 +643,7 @@ Suggest.attach(barAddress, (value) => go(value));
 document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape") return Menu.close();
 	if (event.ctrlKey || event.metaKey || event.altKey) return;
+	if (Home.toolOpen()) return; // keys belong to the calculator, timer or notes
 	const t = event.target;
 	if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
 	const key = event.key.toLowerCase();

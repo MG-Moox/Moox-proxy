@@ -1,0 +1,31 @@
+[
+	{
+		"version": "2.2.0",
+		"date": "2026-10-23",
+		"changes": [
+			"Guest mode: try Moox for 30 minutes a day without an account",
+			"New home page: greeting, quick links, weather, calculator, timer and notes",
+			"Animated backgrounds, custom accent colours, wallpapers, fonts and corner styles",
+			"Better on phones: bottom sheets, bigger buttons, safe areas and move buttons for favorites",
+			"Warning when Moox is opened inside the Google app or another in-app browser",
+			"Version number at the bottom that updates itself, with this list"
+		]
+	},
+	{
+		"version": "2.1.0",
+		"date": "2026-10-22",
+		"changes": [
+			"Invite links for unlock codes, a message banner from the admin, device log-out and account deletion"
+		]
+	},
+	{
+		"version": "2.0.0",
+		"date": "2026-10-22",
+		"changes": [
+			"Accounts with a free daily time limit that resets at midnight Sydney time",
+			"One-time unlock codes for unlimited time",
+			"Admin page with live connections, users, codes and a security log",
+			"Favorites, history and settings sync to your account"
+		]
+	}
+]

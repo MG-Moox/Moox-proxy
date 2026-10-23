@@ -137,6 +137,12 @@ export function createDb({ url, token, timeoutMs = 8000 }) {
 		batch: (stmts) => pipeline(stmts),
 		async migrate() {
 			await pipeline(SCHEMA.map((s) => [s, []]));
+			// Added later: marks guest accounts. Ignore "duplicate column" on existing databases.
+			try {
+				await pipeline([["ALTER TABLE users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0", []]]);
+			} catch (e) {
+				if (!/duplicate column/i.test(e.message)) throw e;
+			}
 		},
 	};
 }

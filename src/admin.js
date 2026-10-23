@@ -90,7 +90,7 @@ export function createAdmin({ password, accounts, events }) {
 			case "/admin/api/live":
 				return json(res, 200, { connections: A.tracker.list().sort((a, b) => b.since - a.since) });
 			case "/admin/api/users":
-				return json(res, 200, { users: await A.listUsers(url.searchParams.get("q")) });
+				return json(res, 200, { users: await A.listUsers(url.searchParams.get("q"), url.searchParams.get("guests") === "1") });
 			case "/admin/api/user": {
 				const b = await readJson(req);
 				await A.userAction(parseInt(b.id, 10), String(b.action), b.arg);
@@ -135,6 +135,11 @@ export function createAdmin({ password, accounts, events }) {
 			case "/admin/api/lockdown": {
 				const b = await readJson(req);
 				await A.setLockdown(Boolean(b.on));
+				return json(res, 200, { ok: true });
+			}
+			case "/admin/api/guests": {
+				const b = await readJson(req);
+				await A.setGuests(Boolean(b.on));
 				return json(res, 200, { ok: true });
 			}
 			case "/admin/api/announcement": {
@@ -324,7 +329,7 @@ function rOverview(body) {
   api("overview").then(function (s) {
     var items = [
       [s.onlineUsers, "people online"], [s.connections, "live connections"], [s.users, "accounts"],
-      [s.premium, "unlimited accounts"], [s.signups24h, "sign-ups (24h)"], [s.failedLogins1h, "failed logins (1h)"],
+      [s.premium, "unlimited accounts"], [s.signups24h, "sign-ups (24h)"], [s.guests24h, "guests (24h)"], [s.failedLogins1h, "failed logins (1h)"],
       [s.warnings1h, "warnings (1h)"], [s.alerts24h, "alerts (24h)"], [s.banned, "suspended accounts"],
       [s.blockedIps, "blocked IPs"], [s.codesUnused, "unused codes"], [s.codesUsed, "used codes"]
     ];
@@ -366,9 +371,10 @@ function rLive(body) {
 // ---------- users ----------
 function rUsers(body) {
   var q = h("input", { type: "search", placeholder: "Search username" });
+  var gcb = h("input", { type: "checkbox", id: "showg" });
   var list = h("div");
   function load() {
-    api("users?q=" + encodeURIComponent(q.value)).then(function (d) {
+    api("users?q=" + encodeURIComponent(q.value) + (gcb.checked ? "&guests=1" : "")).then(function (d) {
       var t = h("table", null, h("thead", null, h("tr", null, ["User", "Status", "Today", "Last login", "Signed up", "Actions"].map(function (x) { return h("th", null, x); }))));
       var tb = h("tbody");
       d.users.forEach(function (u) {
@@ -381,7 +387,7 @@ function rUsers(body) {
           ? h("button", { class: "sm", onclick: act(function () { return api("user", { id: u.id, action: "unban" }); }, load) }, "Unsuspend")
           : h("button", { class: "sm dng", onclick: function () { var r = prompt("Suspend " + u.username + "? Optional reason:", ""); if (r !== null) act(function () { return api("user", { id: u.id, action: "ban", arg: r }); }, load)(); } }, "Suspend");
         tb.append(h("tr", null,
-          h("td", null, h("b", null, u.username), h("div", { class: "mut mono" }, "#" + u.id)),
+          h("td", null, h("b", null, u.username), h("div", { class: "mut mono" }, "#" + u.id + (u.guest ? " · guest" : ""))),
           h("td", null, status),
           h("td", null, fmtDur(u.today)),
           h("td", null, fmtTime(u.last_login), h("div", { class: "mut mono" }, u.last_ip || "")),
@@ -401,7 +407,8 @@ function rUsers(body) {
     }).catch(function (e) { list.replaceChildren(msg("bad", e.message)); });
   }
   q.addEventListener("input", function () { clearTimeout(q._t); q._t = setTimeout(load, 250); });
-  body.replaceChildren(h("div", { class: "card" }, h("h2", null, "Accounts"), h("div", { class: "row" }, q, h("button", { onclick: load }, "Refresh")), list));
+  body.replaceChildren(h("div", { class: "card" }, h("h2", null, "Accounts"), h("div", { class: "row" }, q, h("label", null, gcb, " show guests"), h("button", { onclick: load }, "Refresh")), list));
+  gcb.addEventListener("change", load);
   load();
 }
 
@@ -510,6 +517,11 @@ function rControls(body) {
           h("p", { class: "mut" }, "Shows as a banner to every signed-in person, e.g. \"Back online at 5pm\". Leave empty and save to remove it."),
           h("div", { class: "row" }, ann, h("button", { class: "pri", onclick: act(function () { return api("announcement", { text: ann.value }); }, function () { alert("Saved."); }) }, "Save message"))),
         h("div", { class: "card" }, h("h2", null, "Who can sign up"), mRow),
+        h("div", { class: "card" }, h("h2", null, "Guest access"),
+          h("p", { class: "mut" }, "Guests get " + s.guestMinutes + " minutes a day with nothing saved, then see Log in / Sign up."),
+          h("div", { class: "row" },
+            h("button", { class: s.guestsEnabled ? "on" : "", onclick: act(function () { return api("guests", { on: true }); }, load) }, "Guests allowed"),
+            h("button", { class: s.guestsEnabled ? "" : "on", onclick: act(function () { return api("guests", { on: false }); }, load) }, "Guests off"))),
         h("div", { class: "card" }, h("h2", null, "Backup"),
           h("p", { class: "mut" }, "Downloads a file with your accounts (no passwords), codes and blocked IPs, in case the database is ever lost."),
           h("button", { onclick: function () {

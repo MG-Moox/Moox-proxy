@@ -2,7 +2,10 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Moox" />
 		<title>Moox Proxy</title>
 		<meta name="theme-color" content="#111111" />
 		<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
@@ -19,6 +22,9 @@
 		<script src="store.js" defer></script>
 		<script src="suggest.js" defer></script>
 		<script src="account.js" defer></script>
+		<script src="bg.js" defer></script>
+		<script src="home.js" defer></script>
+		<script src="mobile.js" defer></script>
 		<script src="menu.js" defer></script>
 		<script src="app.js" defer></script>
 	</head>
@@ -49,6 +55,8 @@
 				<div id="clock-time"></div>
 				<div id="clock-date"></div>
 			</div>
+			<p id="greeting" hidden></p>
+			<button id="weather-mini" type="button" class="chip" hidden></button>
 
 			<h1>Moox Proxy</h1>
 			<form id="form">
@@ -58,10 +66,35 @@
 			<p id="error" class="err" role="alert"></p>
 			<pre id="error-code" class="err"></pre>
 
+			<section id="tools" aria-label="Tools">
+				<button type="button" class="chip" data-tool="calc"><span aria-hidden="true">&#129518;</span> Calculator</button>
+				<button type="button" class="chip" data-tool="weather"><span aria-hidden="true">&#127780;&#65039;</span> Weather</button>
+				<button type="button" class="chip" data-tool="timer"><span aria-hidden="true">&#9201;&#65039;</span> Timer</button>
+				<button type="button" class="chip" data-tool="notes"><span aria-hidden="true">&#128221;</span> Notes</button>
+			</section>
+
+			<section id="quick" aria-label="Quick links" hidden>
+				<div id="quick-grid"></div>
+			</section>
+
 			<section id="favs" aria-label="Favorites">
+				<button id="fav-edit" type="button" class="chip" aria-pressed="false">Edit favorites</button>
 				<div id="fav-grid"></div>
 			</section>
 		</main>
+
+		<footer id="foot"><button id="version" type="button" title="What's new" aria-label="Version, tap to see what's new"></button></footer>
+
+		<!-- Tools panel: calculator, weather, timer, notes (filled in by home.js) -->
+		<div id="tool" hidden>
+			<div class="tool-card" role="dialog" aria-modal="true" aria-labelledby="tool-title">
+				<div class="tool-head">
+					<h2 id="tool-title"></h2>
+					<button id="tool-close" type="button" aria-label="Close">&times;</button>
+				</div>
+				<div id="tool-body"></div>
+			</div>
+		</div>
 
 		<!-- Friendly page for sites that fail to load (filled in by app.js) -->
 		<div id="site-error" hidden></div>
@@ -79,6 +112,7 @@
 
 		<!-- Account: time-left banner and the "used up" screen (filled in by account.js) -->
 		<div id="announce-banner" role="status" hidden></div>
+		<div id="app-warn" role="note" hidden></div>
 		<div id="limit-banner" role="status" hidden></div>
 		<div id="limit-overlay" role="dialog" aria-modal="true" aria-labelledby="limit-title" hidden></div>
 

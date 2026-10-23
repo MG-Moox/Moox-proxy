@@ -15,11 +15,14 @@
 //   ADMIN_PASSWORD  password for /admin (10+ characters). Admin is off if unset.
 //   SIGNUP_MODE     open | code | closed (default open; changeable in /admin)
 //   FREE_MINUTES    free minutes per day (default 60)
+//   GUEST_MINUTES   guest minutes per day (default 30); GUEST_PER_IP guest sessions per IP per day (default 10)
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createAuth } from "./auth.js";
 import { createIcons } from "./icons.js";
 import { createSuggest } from "./suggest.js";
+import { createWeather } from "./weather.js";
+import { readFileSync } from "node:fs";
 import { createDb } from "./db.js";
 import { createEvents } from "./security.js";
 import { createAccounts } from "./accounts.js";
@@ -62,6 +65,11 @@ Object.assign(wisp.options, {
 const auth = createAuth(PASSWORD);
 const icons = createIcons();
 const suggest = createSuggest();
+const weather = createWeather();
+
+// Version shown at the bottom of the home page. The build id is set by Render.
+const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
+const VERSION = JSON.stringify({ version: pkg.version, build: String(process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || null });
 
 // ---------- Accounts (optional) ----------
 const ACCOUNTS_ON = Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
@@ -75,6 +83,8 @@ if (ACCOUNTS_ON) {
 		db,
 		events,
 		freeMinutes: parseFloat(process.env.FREE_MINUTES || "60") || 60,
+		guestMinutes: parseFloat(process.env.GUEST_MINUTES || "30") || 30,
+		guestsPerIp: parseInt(process.env.GUEST_PER_IP || "10", 10) || 10,
 		defaultSignupMode: process.env.SIGNUP_MODE || "open",
 	});
 	admin = createAdmin({ password: process.env.ADMIN_PASSWORD || "", accounts, events });
@@ -89,6 +99,7 @@ const fail500 = (res) => () => {
 function serve(req, res, handler) {
 	if (req.url.startsWith("/icon?")) return void icons.handle(req, res).catch(fail500(res));
 	if (req.url.startsWith("/suggest?")) return void suggest.handle(req, res).catch(fail500(res));
+	if (req.url.startsWith("/weather?")) return void weather.handle(req, res).catch(fail500(res));
 	// Scramjet needs cross-origin isolation.
 	res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 	res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -104,6 +115,11 @@ const fastify = Fastify({
 				if (req.url === "/health") {
 					res.writeHead(200, { "content-type": "text/plain" });
 					return res.end("ok");
+				}
+				// Version number for the footer; harmless to show to anyone.
+				if (req.url === "/version.json") {
+					res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache" });
+					return res.end(VERSION);
 				}
 				if (ACCOUNTS_ON) {
 					if (admin.handle(req, res)) return;

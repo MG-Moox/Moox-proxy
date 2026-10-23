@@ -135,6 +135,90 @@ const Menu = (() => {
 		return el("div", { class: "row" }, el("span", { text: "Accent color" }), wrap);
 	}
 
+	function textRow(label, key, placeholder, max) {
+		const id = uid();
+		const input = el("input", { type: "text", id, maxlength: String(max), placeholder, autocomplete: "off", value: Settings.get(key) });
+		input.addEventListener("change", () => {
+			if (!Settings.set(key, input.value.trim())) input.value = Settings.get(key);
+		});
+		return el("div", { class: "row stack-row" }, el("label", { for: id, text: label }), input);
+	}
+
+	function colorRow() {
+		const id = uid();
+		const input = el("input", { type: "color", id, value: Settings.get("accentCustom") });
+		input.addEventListener("input", () => {
+			Settings.set("accentCustom", input.value);
+			Settings.set("accent", "custom");
+			document.querySelectorAll(".swatch").forEach((b) => b.setAttribute("aria-pressed", "false"));
+		});
+		return el("div", { class: "row" }, el("label", { for: id, text: "Your own color" }), input);
+	}
+
+	// Shrinks a picture to a sensible size so it fits in browser storage.
+	function readPicture(file) {
+		return new Promise((resolve, reject) => {
+			const url = URL.createObjectURL(file);
+			const img = new Image();
+			img.onload = () => {
+				const max = 1600;
+				const scale = Math.min(1, max / Math.max(img.width, img.height));
+				const c = document.createElement("canvas");
+				c.width = Math.max(1, Math.round(img.width * scale));
+				c.height = Math.max(1, Math.round(img.height * scale));
+				c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+				URL.revokeObjectURL(url);
+				resolve(c.toDataURL("image/jpeg", 0.82));
+			};
+			img.onerror = () => (URL.revokeObjectURL(url), reject(new Error("bad image")));
+			img.src = url;
+		});
+	}
+
+	function wallpaperRow() {
+		const input = el("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Choose a background picture" });
+		input.addEventListener("change", async () => {
+			const f = input.files[0];
+			input.value = "";
+			if (!f) return;
+			if (!f.type.startsWith("image/")) return say("That isn't a picture.");
+			try {
+				const data = await readPicture(f);
+				if (Settings.setWallpaper(data)) {
+					render();
+					say("Background picture set.");
+				} else say("That picture is too big for this browser to keep. Try a smaller one.");
+			} catch {
+				say("Couldn't read that picture.");
+			}
+		});
+		return [
+			el(
+				"div",
+				{ class: "row" },
+				el("span", { text: "Your own picture" }),
+				el(
+					"div",
+					{ class: "btn-row" },
+					el("button", { type: "button", class: "btn", text: Settings.hasWallpaper() ? "Change…" : "Choose…", onclick: () => input.click() }),
+					Settings.hasWallpaper()
+						? el("button", {
+								type: "button",
+								class: "btn",
+								text: "Remove",
+								onclick: () => {
+									Settings.clearWallpaper();
+									render();
+								},
+						  })
+						: null,
+					input
+				)
+			),
+			el("p", { class: "hint", text: "Saved in this browser only. Pick \u201cMy picture\u201d as the home background to show it." }),
+		];
+	}
+
 	function zoomRow() {
 		const out = el("output", { "aria-live": "polite" });
 		const show = () => (out.textContent = Settings.get("zoom") + "%");
@@ -182,9 +266,38 @@ const Menu = (() => {
 				el("h3", { text: "Appearance" }),
 				selectRow("Theme", "theme", [["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]),
 				accentRow(),
-				selectRow("Home background", "bg", [["plain", "Plain"], ["gradient", "Soft gradient"], ["aurora", "Aurora"], ["grid", "Grid"]]),
-				selectRow("Clock on home page", "clock", [["off", "Off"], ["12", "12-hour"], ["24", "24-hour"]]),
-				toggleRow("Show favorites on home page", "showFavs")
+				colorRow(),
+				selectRow("Home background", "bg", [
+					["plain", "Plain"],
+					["gradient", "Soft gradient"],
+					["aurora", "Aurora"],
+					["grid", "Grid"],
+					["flow", "Flowing colors (animated)"],
+					["stars", "Twinkling stars (animated)"],
+					["snow", "Falling snow (animated)"],
+					["bubbles", "Floating bubbles (animated)"],
+					["fireflies", "Fireflies (animated)"],
+					["custom", "My picture"],
+				]),
+				wallpaperRow(),
+				Settings.get("bg") === "custom" ? selectRow("Dim my picture", "bgDim", [[0, "None"], [20, "A little"], [40, "Medium"], [60, "A lot"]], "Makes text easier to read on bright pictures.") : null,
+				selectRow("Font", "fontStyle", [["system", "Standard"], ["serif", "Serif"], ["mono", "Monospace"], ["rounded", "Rounded"]]),
+				selectRow("Corners", "corners", [["sharp", "Sharp"], ["normal", "Normal"], ["round", "Very round"]]),
+				selectRow("Tile style", "tileStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"]]),
+				selectRow("Tile size", "tileSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"]])
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Home page" }),
+				selectRow("Clock", "clock", [["off", "Off"], ["12", "12-hour"], ["24", "24-hour"]]),
+				toggleRow("Greeting", "greeting"),
+				textRow("Name for the greeting", "userName", "Your name (optional)", 30),
+				toggleRow("Quick links (YouTube, Google...)", "quickLinks"),
+				toggleRow("Tools (calculator, timer, notes, weather)", "tools"),
+				toggleRow("Favorites", "showFavs"),
+				textRow("Weather city", "weatherCity", "e.g. Sydney", 60),
+				selectRow("Temperature", "units", [["c", "\u00b0C"], ["f", "\u00b0F"]])
 			),
 			el(
 				"fieldset",
@@ -242,6 +355,24 @@ const Menu = (() => {
 		say(`Imported ${added.favorites} favorite(s) and ${added.history} history item(s), plus your settings.`);
 	}
 
+	// Help for putting Moox on a home screen / desktop.
+	function installGroup() {
+		const info = typeof Mobile !== "undefined" ? Mobile.installInfo() : null;
+		if (!info || info.standalone) return null;
+		const kids = [el("h3", { text: "Install as an app" })];
+		if (info.canPrompt) {
+			kids.push(
+				el("p", { class: "hint", text: "Adds Moox to your home screen or desktop so it opens like an app." }),
+				el("div", { class: "btn-row" }, el("button", { type: "button", class: "btn primary", text: "Install Moox", onclick: () => Mobile.promptInstall() }))
+			);
+		} else if (info.ios) {
+			kids.push(el("p", { class: "hint", text: info.inApp ? "Open this page in Safari first. Then tap the Share button and choose Add to Home Screen." : "Tap the Share button in Safari, then choose Add to Home Screen." }));
+		} else {
+			kids.push(el("p", { class: "hint", text: "In Chrome, use the install icon in the address bar, or the ⋮ menu and Install app." }));
+		}
+		return el("fieldset", { class: "group" }, kids);
+	}
+
 	function renderMore() {
 		const fileInput = el("input", { type: "file", accept: "application/json,.json", hidden: true, "aria-label": "Choose a backup file" });
 		fileInput.addEventListener("change", () => {
@@ -290,6 +421,7 @@ const Menu = (() => {
 				el("p", { class: "hint", text: "Work when you're not typing in a box. While a website has focus, click the bar at the top first." }),
 				el("ul", { class: "keys" }, keys.map(([what, key]) => el("li", {}, el("span", { text: what }), el("kbd", { text: key }))))
 			),
+			installGroup(),
 			el(
 				"fieldset",
 				{ class: "group" },

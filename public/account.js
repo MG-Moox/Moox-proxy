@@ -55,7 +55,7 @@ const Account = (() => {
 
 	// ---------- sync ----------
 	function snapshot() {
-		return { favorites: Store.favorites(), history: Store.history(), settings: Settings.exportSettings() };
+		return { favorites: Store.favorites(), history: Store.history(), settings: Settings.exportSettings(), notes: Store.notes() };
 	}
 	function scheduleSync() {
 		if (!enabled || applying) return;
@@ -137,7 +137,9 @@ const Account = (() => {
 		// Low-time banner
 		const left = me.remainingSeconds;
 		if (!me.premium && !me.limited && left != null && left <= 600) {
-			banner.textContent = `${dur(left)} of free time left today. It resets at midnight Sydney time.`;
+			banner.textContent = me.guest
+				? `${dur(left)} of guest time left. Sign up for more, free.`
+				: `${dur(left)} of free time left today. It resets at midnight Sydney time.`;
 			banner.hidden = false;
 		} else banner.hidden = true;
 		// "Used up" screen
@@ -157,6 +159,26 @@ const Account = (() => {
 			tick();
 			if (resetIn() <= 0) refresh();
 		}, 1000);
+		if (me.guest) {
+			overlay.replaceChildren(
+				el(
+					"div",
+					{ class: "limit-card" },
+					el("h2", { id: "limit-title", text: "Your guest time is up" }),
+					el("p", { text: "Log in or sign up to keep browsing. It's free." }),
+					el(
+						"div",
+						{ class: "btn-row center" },
+						el("a", { class: "btn primary", href: "/login", text: "Log in" }),
+						el("a", { class: "btn", href: "/login#signup", text: "Sign up" })
+					),
+					el("p", { class: "muted" }, "Guest time comes back at midnight Sydney time, in ", countdown, ".")
+				)
+			);
+			overlay.hidden = false;
+			overlay.querySelector("a").focus();
+			return;
+		}
 		overlay.replaceChildren(
 			el(
 				"div",
@@ -193,6 +215,22 @@ const Account = (() => {
 	// ---------- the Account tab (drawn by menu.js) ----------
 	function renderTab(body, say) {
 		if (!me) return body.append(el("p", { class: "hint", text: "Loading…" }));
+		if (me.guest) {
+			const gm = el("div", { class: "meter", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(me.limitSeconds), "aria-valuenow": String(me.usedSeconds) });
+			gm.append(el("div", { class: "meter-fill", style: `width:${Math.min(100, (me.usedSeconds / me.limitSeconds) * 100)}%` }));
+			return body.append(
+				el(
+					"fieldset",
+					{ class: "group" },
+					el("h3", { text: "Guest" }),
+					el("p", { text: "You're browsing as a guest. Nothing is saved to an account." }),
+					gm,
+					el("p", { class: "hint", text: `${dur(me.usedSeconds)} used of ${dur(me.limitSeconds)} today. Resets in ${dur(resetIn())} (midnight Sydney time).` }),
+					el("div", { class: "btn-row" }, el("a", { class: "btn primary", href: "/login", text: "Log in" }), el("a", { class: "btn", href: "/login#signup", text: "Sign up" })),
+					el("p", { class: "hint", text: "A free account gets more time every day and saves your favorites, notes and settings." })
+				)
+			);
+		}
 		const used = me.usedSeconds;
 		const meter = el("div", { class: "meter", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(me.limitSeconds || 0) });
 		if (me.premium) {
@@ -310,6 +348,18 @@ const Account = (() => {
 		);
 	}
 
+	function startPolling() {
+		pollTimer = setInterval(refresh, 30000);
+		document.addEventListener("visibilitychange", () => {
+			if (!document.hidden) refresh();
+		});
+	}
+
+	// A guest: no saved data and no syncing, just the time meter and the limit screen.
+	function startGuest() {
+		startPolling();
+	}
+
 	// ---------- start ----------
 	async function init(context) {
 		ctx = context || ctx;
@@ -327,13 +377,11 @@ const Account = (() => {
 		document.getElementById("tab-account").hidden = false;
 		draw();
 		notify();
+		if (me.guest) return startGuest();
 		Store.onChange(scheduleSync);
 		Settings.onChange(scheduleSync);
 		await pull();
-		pollTimer = setInterval(refresh, 30000);
-		document.addEventListener("visibilitychange", () => {
-			if (!document.hidden) refresh();
-		});
+		startPolling();
 		window.addEventListener("pagehide", () => {
 			if (syncTimer) {
 				clearTimeout(syncTimer);
@@ -348,6 +396,8 @@ const Account = (() => {
 	return {
 		init,
 		enabled: () => enabled,
+		isGuest: () => Boolean(me && me.guest),
+		username: () => (me && !me.guest ? me.username : ""),
 		renderTab,
 		onChange: (fn) => subs.push(fn),
 		refresh,

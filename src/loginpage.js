@@ -2,7 +2,7 @@
 const esc = (s) =>
 	String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-export function loginPage(next, signupMode, freeMinutes) {
+export function loginPage(next, signupMode, freeMinutes, guestMinutes = 0) {
 	return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Log in | Moox Proxy</title>
@@ -40,9 +40,14 @@ input{width:100%;padding:.7rem;font-size:1rem;border:1px solid #888;border-radiu
 <button class="go" id="go" type="submit">Log in</button>
 <p class="hint" id="hint" hidden></p>
 </form>
+<div id="guestbox" hidden style="margin-top:1.2rem;text-align:center">
+<p class="hint">or</p>
+<button type="button" class="tabsbtn" id="guest" style="padding:.7rem 1rem;border:1px solid #888;background:transparent;color:inherit;border-radius:6px;cursor:pointer;font-size:1rem;width:100%">Continue as guest</button>
+<p class="hint" id="guesthint"></p>
+</div>
 <script>
 (function(){
-var NEXT=${JSON.stringify(next)}, MODE=${JSON.stringify(signupMode)}, FREE=${JSON.stringify(freeMinutes)};
+var NEXT=${JSON.stringify(next)}, MODE=${JSON.stringify(signupMode)}, FREE=${JSON.stringify(freeMinutes)}, GUEST=${JSON.stringify(guestMinutes)};
 var mode="login";
 var $=function(i){return document.getElementById(i)};
 function set(m){
@@ -78,6 +83,17 @@ $("f").onsubmit=function(e){
    })
    .catch(function(){$("err").textContent="Could not reach the server. Try again.";b.disabled=false;});
 };
+if(GUEST>0){
+  $("guestbox").hidden=false;
+  $("guesthint").textContent="Guests get "+GUEST+" minutes a day, and nothing is saved. Sign up for "+FREE+" minutes and saved favorites.";
+  $("guest").onclick=function(){
+    $("guest").disabled=true;$("err").textContent="";
+    fetch("/api/guest",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:"{}"})
+     .then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})})
+     .then(function(x){if(x.ok&&x.j.ok){location.href=NEXT||"/";return;}$("err").textContent=x.j.error||"Something went wrong.";$("guest").disabled=false;})
+     .catch(function(){$("err").textContent="Could not reach the server. Try again.";$("guest").disabled=false;});
+  };
+}
 var qc=new URLSearchParams(location.search).get("code");
 if(qc){set("signup");$("c").value=qc.slice(0,25);}
 else set(location.hash==="#signup"?"signup":"login");

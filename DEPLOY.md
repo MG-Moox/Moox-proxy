@@ -63,13 +63,16 @@ Moox can run with accounts. It switches on automatically when these settings exi
 | `ADMIN_PASSWORD` | a password only you know, 10+ characters (opens `/admin`) |
 | `SIGNUP_MODE` | optional: `open` (default), `code` or `closed`. Also changeable in the admin page |
 | `FREE_MINUTES` | optional: free minutes per day (default 60) |
+| `GUEST_MINUTES` | optional: minutes per day for guests (default 30) |
+| `GUEST_PER_IP` | optional: guest sessions allowed per IP address per day (default 10) |
 
 Without the two Turso settings the site keeps using the single `PROXY_PASSWORD` login. With them, `PROXY_PASSWORD` is no longer used.
 
 **How it works**
 - Anyone can sign up (unless you change that). Free accounts get 60 minutes a day of active browsing. It resets at midnight Sydney time. Time only counts while data is actually moving, not while a page sits idle.
 - An unlock code makes one account unlimited. Each code works once, ever, on one account only.
-- Favorites, history and settings are saved to the account and follow you between devices.
+- Favorites, history, notes and settings are saved to the account and follow you between devices.
+- **Guests** can press "Continue as guest" for 30 minutes a day with nothing saved. When it runs out they see Log in / Sign up. Guests are limited to a few sessions per IP address per day, and you can switch guest access off in the admin page under Controls. On a shared school network, many students share one IP address, so lower or raise `GUEST_PER_IP` to suit.
 - There is no password reset (no email). You can set a new password for someone in the admin page.
 
 **Making a Turso database**
@@ -95,3 +98,10 @@ Without the two Turso settings the site keeps using the single `PROXY_PASSWORD` 
 ## Keeping it awake
 
 Add a monitor at uptimerobot.com for `https://YOUR-ADDRESS/health` every 5 minutes. That page needs no login.
+
+## Home page, tools and looks
+
+- The home page has a greeting, quick links, and tools: calculator, weather (asked from the server, cached for 10 minutes), timer/stopwatch and notes (synced to your account).
+- The version number at the bottom comes from `package.json`. Tap it to see what's new, which reads `public/changelog.json`. When you change something, add an entry at the top of that file and raise `version` in `package.json`.
+- Settings has animated backgrounds (flowing gradient, aurora, stars, snow, bubbles, fireflies), a custom accent colour, your own wallpaper picture, fonts, corner and tile styles, and a "Reduce motion" switch that freezes the animation.
+- On phones the menu is a bottom sheet, buttons are bigger, and "Edit favorites" shows rename, remove and move buttons. If Moox is opened inside the Google app or another in-app browser, a banner tells people to open it in Safari or Chrome.

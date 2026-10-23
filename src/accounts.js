@@ -93,14 +93,17 @@ function clean(v, depth = 0) {
 	return null;
 }
 
-export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode = "open" }) {
+export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30, guestsPerIp = 10, defaultSignupMode = "open" }) {
 	const limiter = createLimiter();
 	const FREE_SECONDS = Math.max(60, Math.round(freeMinutes * 60));
+	const GUEST_SECONDS = Math.max(60, Math.round(guestMinutes * 60));
+	const limitFor = (u) => (u && u.guest ? GUEST_SECONDS : FREE_SECONDS);
 
 	const state = {
 		signupMode: ["open", "code", "closed"].includes(defaultSignupMode) ? defaultSignupMode : "open",
 		lockdown: false,
 		announcement: "",
+		guestsEnabled: true,
 	};
 	const bannedIps = new Map(); // ip -> reason
 	const sessionCache = new Map(); // hash -> { user|null, exp }
@@ -126,6 +129,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			if (r.key === "signup_mode" && ["open", "code", "closed"].includes(r.value)) state.signupMode = r.value;
 			if (r.key === "lockdown") state.lockdown = r.value === "1";
 			if (r.key === "announcement") state.announcement = String(r.value || "");
+			if (r.key === "guests") state.guestsEnabled = r.value !== "0";
 		}
 		for (const r of (await db.exec("SELECT ip,reason FROM banned_ips")).rows) bannedIps.set(r.ip, r.reason || "");
 		await maintenance();
@@ -138,6 +142,13 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 		await db.exec("DELETE FROM sessions WHERE expires < ?", [Date.now()]);
 		await db.exec("DELETE FROM events WHERE ts < ?", [Date.now() - 30 * 24 * 3600 * 1000]);
 		await db.exec("DELETE FROM usage WHERE day < ?", [sydneyDay(Date.now() - 45 * 24 * 3600 * 1000)]);
+		// Throw away old guest accounts (they have no password and no saved data).
+		const old = Date.now() - 14 * 24 * 3600 * 1000;
+		await db.batch([
+			["DELETE FROM usage WHERE user_id IN (SELECT id FROM users WHERE guest=1 AND created < ?)", [old]],
+			["DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE guest=1 AND created < ?)", [old]],
+			["DELETE FROM users WHERE guest=1 AND created < ?", [old]],
+		]);
 	}
 
 	async function setSetting(key, value) {
@@ -247,7 +258,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 				const u = await getUserById(uid).catch(() => null);
 				if (!u) continue;
 				if (u.banned) kickUser(uid);
-				else if (!isPremium(u) && (await usedToday(uid)) >= FREE_SECONDS) {
+				else if (!isPremium(u) && (await usedToday(uid)) >= limitFor(u)) {
 					kickUser(uid);
 					if (once(`limit:${uid}:${sydneyDay()}`, 24 * 3600 * 1000))
 						events.log("limit_reached", "info", { userId: uid, username: u.username, detail: "free daily time used up" });
@@ -394,11 +405,12 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			username: user.username,
 			premium,
 			premiumUntil: premium ? (user.premium_until >= FOREVER ? "never" : user.premium_until) : null,
-			limitSeconds: premium ? null : FREE_SECONDS,
-			usedSeconds: Math.min(used, premium ? used : FREE_SECONDS),
-			remainingSeconds: premium ? null : Math.max(0, FREE_SECONDS - used),
+			guest: Boolean(user.guest),
+			limitSeconds: premium ? null : limitFor(user),
+			usedSeconds: Math.min(used, premium ? used : limitFor(user)),
+			remainingSeconds: premium ? null : Math.max(0, limitFor(user) - used),
 			resetInSeconds: secondsUntilReset(),
-			limited: !premium && used >= FREE_SECONDS,
+			limited: !premium && used >= limitFor(user),
 			day: sydneyDay(),
 			announcement: state.announcement,
 		};
@@ -506,8 +518,24 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 		}
 	}
 
+	async function apiGuest(req, res, ip) {
+		if (!state.guestsEnabled) return json(res, 403, { error: "Guest access is turned off." });
+		if (!limiter.hit(`guest:ip:${ip}`, guestsPerIp, 24 * 3600_000)) {
+			if (once(`guestflood:${ip}`, 3600_000)) events.log("guest_flood", "warn", { ip, detail: `more than ${guestsPerIp} guest sessions from one IP in a day` });
+			return json(res, 429, { error: "Guest access isn't available from your network right now. Please sign up." });
+		}
+		const name = "guest-" + newToken().replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase();
+		const r = await db.exec(
+			"INSERT INTO users (username,pass,created,last_login,last_ip,signup_ip,guest) VALUES (?,?,?,?,?,?,1)",
+			[name, "!", Date.now(), Date.now(), ip, ip]
+		);
+		const token = await createSession({ id: r.lastId }, req, ip);
+		json(res, 200, { ok: true, next: "/" }, { "set-cookie": cookieHeader(req, token, 7 * 24 * 3600) });
+	}
+
 	async function apiRedeem(req, res, ip, user) {
 		const body = await readJson(req, 2000);
+		if (user.guest) return json(res, 403, { error: "Sign up or log in first, then enter your code." });
 		if (limiter.count(`rd:${user.id}`, 15 * 60_000) >= 8 || limiter.count(`rd:ip:${ip}`, 15 * 60_000) >= 15)
 			return json(res, 429, { error: "Too many wrong codes. Wait 15 minutes." });
 		const claimed = await claimCode(body.code);
@@ -572,6 +600,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 	}
 
 	async function apiData(req, res, user) {
+		if (user.guest) return json(res, 403, { error: "Guests can't save data. Sign up to keep your favorites." });
 		if (req.method === "GET") {
 			const r = (await db.exec("SELECT json,updated FROM user_data WHERE user_id=?", [user.id])).rows[0];
 			return json(res, 200, r ? { data: JSON.parse(r.json), updated: r.updated } : { data: null, updated: 0 });
@@ -583,6 +612,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			favorites: Array.isArray(d.favorites) ? clean(d.favorites) : [],
 			history: Array.isArray(d.history) ? clean(d.history) : [],
 			settings: d.settings && typeof d.settings === "object" ? clean(d.settings) : {},
+			notes: typeof d.notes === "string" ? d.notes.slice(0, 8000) : "",
 		};
 		const text = JSON.stringify(out);
 		if (text.length > 300_000) return json(res, 413, { error: "too large" });
@@ -614,11 +644,12 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 
 			// ---- pages that need no login ----
 			if (path === "/api/public" && req.method === "GET") {
-				json(res, 200, { signupMode: state.signupMode, freeMinutes: Math.round(FREE_SECONDS / 60) });
+				json(res, 200, { signupMode: state.signupMode, freeMinutes: Math.round(FREE_SECONDS / 60), guestMinutes: state.guestsEnabled ? Math.round(GUEST_SECONDS / 60) : 0 });
 				return null;
 			}
 			if (path === "/api/login" && req.method === "POST") return (await apiLogin(req, res, ip), null);
 			if (path === "/api/signup" && req.method === "POST") return (await apiSignup(req, res, ip), null);
+			if (path === "/api/guest" && req.method === "POST") return (await apiGuest(req, res, ip), null);
 			if (path === "/logout") {
 				const token = parseCookies(req).moox_session;
 				if (token) await db.exec("DELETE FROM sessions WHERE hash=?", [sha256(token)]).catch(() => {});
@@ -632,12 +663,12 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			const user = await sessionUser(req);
 
 			if (path === "/login") {
-				if (user) {
+				if (user && !user.guest) {
 					res.writeHead(302, { location: safeNext(url.searchParams.get("next")) });
 					return res.end(), null;
 				}
 				res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-				res.end(loginPage(safeNext(url.searchParams.get("next")), state.signupMode, Math.round(FREE_SECONDS / 60)));
+				res.end(loginPage(safeNext(url.searchParams.get("next")), state.signupMode, Math.round(FREE_SECONDS / 60), state.guestsEnabled ? Math.round(GUEST_SECONDS / 60) : 0));
 				return null;
 			}
 
@@ -692,7 +723,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 				return { ok: false, status: 401 };
 			}
 			if (state.lockdown) return { ok: false, status: 503 };
-			if (!isPremium(user) && (await usedToday(user.id)) >= FREE_SECONDS) return { ok: false, status: 429 };
+			if (!isPremium(user) && (await usedToday(user.id)) >= limitFor(user)) return { ok: false, status: 429 };
 			return { ok: true, user, ip };
 		} catch {
 			return { ok: false, status: 503 };
@@ -710,10 +741,11 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 		async stats() {
 			const now = Date.now();
 			const rs = await db.batch([
-				["SELECT COUNT(*) AS n FROM users", []],
+				["SELECT COUNT(*) AS n FROM users WHERE guest=0", []],
 				["SELECT COUNT(*) AS n FROM users WHERE premium_until > ?", [now]],
 				["SELECT COUNT(*) AS n FROM users WHERE banned=1", []],
-				["SELECT COUNT(*) AS n FROM users WHERE created > ?", [now - 86400_000]],
+				["SELECT COUNT(*) AS n FROM users WHERE created > ? AND guest=0", [now - 86400_000]],
+				["SELECT COUNT(*) AS n FROM users WHERE created > ? AND guest=1", [now - 86400_000]],
 				["SELECT COUNT(*) AS n FROM codes WHERE redeemed_by IS NULL AND revoked=0", []],
 				["SELECT COUNT(*) AS n FROM codes WHERE redeemed_by IS NOT NULL AND redeemed_by <> -1", []],
 			]);
@@ -724,8 +756,10 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 				premium: rs[1].rows[0].n,
 				banned: rs[2].rows[0].n,
 				signups24h: rs[3].rows[0].n,
-				codesUnused: rs[4].rows[0].n,
-				codesUsed: rs[5].rows[0].n,
+				guests24h: rs[4].rows[0].n,
+				codesUnused: rs[5].rows[0].n,
+				codesUsed: rs[6].rows[0].n,
+				guestsEnabled: state.guestsEnabled,
 				connections: conns.length,
 				onlineUsers: new Set(conns.map((c) => c.userId)).size,
 				failedLogins1h: events.countSince(hour, (e) => e.type === "login_fail"),
@@ -736,6 +770,7 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 				lockdown: state.lockdown,
 				announcement: state.announcement,
 				freeMinutes: Math.round(FREE_SECONDS / 60),
+				guestMinutes: Math.round(GUEST_SECONDS / 60),
 				uptimeSeconds: Math.round((now - startedAt) / 1000),
 				memoryMb: Math.round(process.memoryUsage().rss / 1048576),
 				day: sydneyDay(),
@@ -743,15 +778,15 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			};
 		},
 
-		async listUsers(q) {
+		async listUsers(q, includeGuests = false) {
 			const like = "%" + String(q || "").replace(/[^A-Za-z0-9_]/g, "") + "%";
 			const rows = (
 				await db.exec(
-					`SELECT u.id,u.username,u.created,u.banned,u.ban_reason,u.premium_until,u.last_login,u.last_ip,u.signup_ip,
+					`SELECT u.id,u.username,u.guest,u.created,u.banned,u.ban_reason,u.premium_until,u.last_login,u.last_ip,u.signup_ip,
 					 (SELECT seconds FROM usage WHERE user_id=u.id AND day=?) AS today,
 					 (SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) AS sessions
-					 FROM users u WHERE u.username LIKE ? ORDER BY u.id DESC LIMIT 200`,
-					[sydneyDay(), Date.now(), like]
+					 FROM users u WHERE u.username LIKE ? AND (u.guest=0 OR ?=1) ORDER BY u.id DESC LIMIT 200`,
+					[sydneyDay(), Date.now(), like, includeGuests ? 1 : 0]
 				)
 			).rows;
 			const day = sydneyDay();
@@ -886,6 +921,11 @@ export function createAccounts({ db, events, freeMinutes = 60, defaultSignupMode
 			state.signupMode = mode;
 			await setSetting("signup_mode", mode);
 			events.log("signup_mode", "info", { detail: "sign-ups set to " + mode });
+		},
+		async setGuests(on) {
+			state.guestsEnabled = Boolean(on);
+			await setSetting("guests", on ? "1" : "0");
+			events.log("guests", "info", { detail: on ? "guest access turned ON" : "guest access turned OFF" });
 		},
 		async setLockdown(on) {
 			state.lockdown = Boolean(on);

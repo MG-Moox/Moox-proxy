@@ -5,6 +5,7 @@
 const Store = (() => {
 	const KEY_FAV = "moox:favorites";
 	const KEY_HIST = "moox:history";
+	const KEY_NOTES = "moox:notes";
 	const MAX_HIST = 300;
 
 	function read(key) {
@@ -57,9 +58,33 @@ const Store = (() => {
 				}));
 			write(KEY_FAV, favs);
 			write(KEY_HIST, hist);
+			if (data && typeof data.notes === "string") {
+				try {
+					localStorage.setItem(KEY_NOTES, data.notes.slice(0, 8000));
+				} catch {}
+			}
 		},
 		favorites: () => read(KEY_FAV),
 		history: () => read(KEY_HIST),
+		notes() {
+			try {
+				return localStorage.getItem(KEY_NOTES) || "";
+			} catch {
+				return "";
+			}
+		},
+		setNotes(text) {
+			const t = String(text || "").slice(0, 8000);
+			try {
+				if (t === (localStorage.getItem(KEY_NOTES) || "")) return;
+				localStorage.setItem(KEY_NOTES, t);
+			} catch {}
+			for (const fn of subs) {
+				try {
+					fn();
+				} catch {}
+			}
+		},
 		isFavorite: (url) => read(KEY_FAV).some((f) => f.url === url),
 
 		// Returns true if the page is now a favorite, false if it was removed.
@@ -136,12 +161,17 @@ const Store = (() => {
 			write(KEY_HIST, []);
 		},
 		clearAll() {
+			try {
+				localStorage.removeItem(KEY_NOTES);
+			} catch {}
 			write(KEY_FAV, []);
 			write(KEY_HIST, []);
 		},
 
 		// ----- Backup / restore -----
-		exportData: () => ({ favorites: read(KEY_FAV), history: read(KEY_HIST) }),
+		exportData() {
+			return { favorites: read(KEY_FAV), history: read(KEY_HIST), notes: this.notes() };
+		},
 
 		// Merges a backup into what's already saved. Everything is validated, so
 		// a damaged or hand-edited file can't break the app. Returns counts added.
@@ -179,6 +209,11 @@ const Store = (() => {
 			}
 			hist.sort((a, b) => b.time - a.time);
 			write(KEY_HIST, hist.slice(0, MAX_HIST));
+			if (typeof data.notes === "string" && data.notes && !this.notes()) {
+				try {
+					localStorage.setItem(KEY_NOTES, data.notes.slice(0, 8000));
+				} catch {}
+			}
 
 			return { favorites: addedFavs, history: addedHist };
 		},
