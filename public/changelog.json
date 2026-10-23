@@ -7,7 +7,8 @@
 			"Tab shapes (Classic, Pills, Underline) and a color stripe per website so tabs are easy to tell apart",
 			"New switch to hide the recent sites row and Reopen session button (the Quick links switch hides quick apps)",
 			"Reopen a closed tab with Ctrl+Shift+T or from the Ctrl+K palette",
-			"Polish: smoother hover and press effects, softer shadows, glowing search box, animated menus and thinner scrollbars"
+			"Polish: smoother hover and press effects, softer shadows, glowing search box, animated menus and thinner scrollbars",
+			"Fixed the page on phones: the background now always fills the screen, even when you scroll or zoom out"
 		]
 	},
 	{

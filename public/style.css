@@ -56,7 +56,11 @@ html[data-text="xlarge"] { font-size: 137%; }
 
 /* ============ Base ============ */
 * { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
+html { background: var(--bg); min-height: 100%; -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; }
+body { min-height: 100vh; min-height: 100dvh; overflow-x: clip; }
+/* One fixed layer paints the wallpaper so it always fills the screen, however far you scroll or zoom out */
+#bg-layer { position: fixed; inset: -2px; z-index: -1; pointer-events: none; background: var(--bg); }
 body {
 	font-family: system-ui, sans-serif;
 	background: var(--bg);
@@ -77,24 +81,24 @@ button { cursor: pointer; }
 .err { color: var(--danger); white-space: pre-wrap; text-align: left; }
 
 /* Home wallpapers */
-html[data-bg="gradient"] body {
+html[data-bg="gradient"] #bg-layer {
 	background-image: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--bg)), var(--bg) 60%);
 	background-attachment: fixed;
 }
-html[data-bg="aurora"] body {
+html[data-bg="aurora"] #bg-layer {
 	background-image:
 		radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 42%),
 		radial-gradient(circle at 88% 18%, color-mix(in srgb, #14b8a6 26%, transparent), transparent 38%),
 		radial-gradient(circle at 60% 95%, color-mix(in srgb, #f472b6 22%, transparent), transparent 40%);
 	background-attachment: fixed;
 }
-html[data-bg="grid"] body {
+html[data-bg="grid"] #bg-layer {
 	background-image:
 		linear-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1px),
 		linear-gradient(90deg, color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1px);
 	background-size: 32px 32px;
 }
-html[data-contrast="high"] body { background-image: none; }
+html[data-contrast="high"] #bg-layer { background-image: none; }
 
 /* ============ Home ============ */
 #home { max-width: 640px; margin: 11vh auto 3rem; padding: 0 1rem; text-align: center; }
@@ -318,18 +322,18 @@ textarea.notes { width: 100%; resize: vertical; min-height: 10rem; }
 .wi { font-size: 1.5rem; }
 
 /* ============ Animated and custom backgrounds ============ */
-html[data-bg="flow"] body {
+html[data-bg="flow"] #bg-layer {
 	background-image: linear-gradient(125deg, color-mix(in srgb, var(--accent) 30%, var(--bg)), var(--bg) 35%, color-mix(in srgb, #14b8a6 26%, var(--bg)) 65%, color-mix(in srgb, #f472b6 24%, var(--bg)));
 	background-size: 320% 320%;
 	background-attachment: fixed;
 	animation: flow 22s ease-in-out infinite;
 }
 @keyframes flow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-html[data-bg="stars"] body { background-image: radial-gradient(ellipse at 50% 120%, color-mix(in srgb, var(--accent) 28%, var(--bg)), var(--bg) 65%); background-attachment: fixed; }
-html[data-bg="snow"] body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)), var(--bg) 70%); background-attachment: fixed; }
-html[data-bg="bubbles"] body { background-image: linear-gradient(200deg, color-mix(in srgb, var(--accent) 20%, var(--bg)), var(--bg) 60%); background-attachment: fixed; }
-html[data-bg="fireflies"] body { background-image: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, #16a34a 18%, var(--bg)), var(--bg) 70%); background-attachment: fixed; }
-html[data-bg="custom"][data-wall="on"] body { background-image: var(--wallpaper); background-size: cover; background-position: center; background-attachment: fixed; }
+html[data-bg="stars"] #bg-layer { background-image: radial-gradient(ellipse at 50% 120%, color-mix(in srgb, var(--accent) 28%, var(--bg)), var(--bg) 65%); background-attachment: fixed; }
+html[data-bg="snow"] #bg-layer { background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)), var(--bg) 70%); background-attachment: fixed; }
+html[data-bg="bubbles"] #bg-layer { background-image: linear-gradient(200deg, color-mix(in srgb, var(--accent) 20%, var(--bg)), var(--bg) 60%); background-attachment: fixed; }
+html[data-bg="fireflies"] #bg-layer { background-image: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, #16a34a 18%, var(--bg)), var(--bg) 70%); background-attachment: fixed; }
+html[data-bg="custom"][data-wall="on"] #bg-layer { background-image: var(--wallpaper); background-size: cover; background-position: center; background-attachment: fixed; }
 html[data-bg="custom"][data-wall="on"] body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; background: rgba(0, 0, 0, var(--dim, .2)); }
 html[data-bg="custom"][data-wall="on"] #greeting, html[data-bg="custom"][data-wall="on"] #clock-date, html[data-bg="custom"][data-wall="on"] #foot { color: #f3f4f6; }
 html[data-bg="custom"][data-wall="on"] h1, html[data-bg="custom"][data-wall="on"] #clock-time { color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, .5); }
@@ -518,3 +522,4 @@ html[data-motion="reduce"] .tile:hover, html[data-motion="reduce"] .chip:hover {
 #bar button.time-pill { width: auto; height: auto; min-width: 0; flex: none; margin: 0 .15rem; }
 #bar button.time-pill { font-size: .8rem; }
 #bar-address { color: var(--fg); }
+@media (max-width: 640px) { body:not(.has-tabs) #home { margin-top: calc(env(safe-area-inset-top, 0px) + 3.6rem); } }
