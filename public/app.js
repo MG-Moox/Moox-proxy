@@ -382,9 +382,67 @@ function updateView() {
 	renderTabs();
 	renderSiteError(tab);
 	updateFavButton();
+	saveSession();
 	if (!browsing) {
 		renderFavorites();
+		renderRecent();
 		renderClock();
+	}
+}
+
+// ---------- Recent sites + reopen last session (home page) ----------
+const SESSION_KEY = "moox:session";
+function saveSession() {
+	const urls = tabs.filter((t) => t.url).map((t) => t.url);
+	if (!urls.length) return; // keep the last real session when everything is closed
+	try {
+		localStorage.setItem(SESSION_KEY, JSON.stringify(urls.slice(0, MAX_TABS)));
+	} catch {}
+}
+function lastSession() {
+	try {
+		const v = JSON.parse(localStorage.getItem(SESSION_KEY) || "[]");
+		return Array.isArray(v) ? v.filter((u) => typeof u === "string") : [];
+	} catch {
+		return [];
+	}
+}
+async function reopenSession(urls) {
+	const first = urls.shift();
+	if (first) await go(first);
+	for (const u of urls) await go(u, { newTab: true });
+}
+function renderRecent() {
+	const box = $("recent");
+	const row = $("recent-row");
+	row.textContent = "";
+	const seen = new Set(Store.favorites().map((f) => hostOf(f.url)));
+	const items = [];
+	for (const h of Store.history()) {
+		const host = hostOf(h.url);
+		if (seen.has(host)) continue;
+		seen.add(host);
+		items.push(h);
+		if (items.length >= 6) break;
+	}
+	const sess = tabs.length ? [] : lastSession();
+	box.hidden = !items.length && !sess.length;
+	if (sess.length) {
+		const b = document.createElement("button");
+		b.type = "button";
+		b.className = "chip";
+		b.textContent = "↩ Reopen last session (" + sess.length + (sess.length === 1 ? " tab)" : " tabs)");
+		b.addEventListener("click", () => reopenSession(sess.slice()));
+		row.append(b);
+	}
+	for (const h of items) {
+		const b = document.createElement("button");
+		b.type = "button";
+		b.className = "chip";
+		b.title = h.url;
+		b.append(makeIcon(h.url, true), document.createTextNode(" " + (h.title || hostOf(h.url)).slice(0, 24)));
+		b.addEventListener("click", (e) => go(h.url, { newTab: e.ctrlKey || e.metaKey }));
+		row.append(b);
 	}
 }
 
@@ -632,6 +690,14 @@ Account.init({
 });
 
 Home.init({ go, makeIcon, hostOf });
+Apps.init({
+	go,
+	makeIcon,
+	hostOf,
+	openTool: (n) => Home.openByName(n),
+	openMenu: (n) => Menu.open(n),
+	newTab: newBlankTab,
+});
 Backgrounds.init();
 Account.onChange(() => Home.renderGreeting());
 
@@ -643,6 +709,7 @@ Suggest.attach(barAddress, (value) => go(value));
 document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape") return Menu.close();
 	if (event.ctrlKey || event.metaKey || event.altKey) return;
+	if (Apps.isOpen()) return;
 	if (Home.toolOpen()) return; // keys belong to the calculator, timer or notes
 	const t = event.target;
 	if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;

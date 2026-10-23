@@ -2,6 +2,7 @@
 // limit (resets at midnight Sydney time), one-time unlock codes, per-account
 // data sync, live connection tracking, and the operations the admin page uses.
 import { randomInt } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
 	hashPassword,
 	verifyPassword,
@@ -21,6 +22,7 @@ const CACHE_MS = 30_000;
 const TICK_MS = 5000;
 const FLUSH_MS = 30_000;
 const ACTIVE_BYTES = 512; // data moved in a tick for it to count as "in use"
+const ACTIVE_GRACE_MS = 45_000; // after that, reading a page still counts for this long
 const MAX_CONN_PER_USER = 8;
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -93,6 +95,32 @@ function clean(v, depth = 0) {
 	return null;
 }
 
+// A launcher entry for the Apps page. Returns null if it isn't a usable web link.
+export function cleanApp(a) {
+	const name = String((a && a.name) || "").trim().slice(0, 40);
+	let url = String((a && a.url) || "").trim();
+	if (!name || !url || url.length > 2000) return null;
+	if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+	let u;
+	try {
+		u = new URL(url);
+	} catch {
+		return null;
+	}
+	if (!/^https?:$/.test(u.protocol) || !u.hostname.includes(".")) return null;
+	const category = String((a && a.category) || "More").trim().slice(0, 24) || "More";
+	return { name, url: u.href, category };
+}
+
+function readDefaultApps() {
+	try {
+		const list = JSON.parse(readFileSync(new URL("../public/apps-default.json", import.meta.url), "utf8"));
+		return (Array.isArray(list) ? list : []).map(cleanApp).filter(Boolean);
+	} catch {
+		return [];
+	}
+}
+
 export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30, guestsPerIp = 10, defaultSignupMode = "open" }) {
 	const limiter = createLimiter();
 	const FREE_SECONDS = Math.max(60, Math.round(freeMinutes * 60));
@@ -132,6 +160,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			if (r.key === "guests") state.guestsEnabled = r.value !== "0";
 		}
 		for (const r of (await db.exec("SELECT ip,reason FROM banned_ips")).rows) bannedIps.set(r.ip, r.reason || "");
+		await seedApps();
 		await maintenance();
 		setInterval(() => maintenance().catch(() => {}), 6 * 3600 * 1000).unref();
 		setInterval(() => limiter.sweep(), 10 * 60 * 1000).unref();
@@ -142,6 +171,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		await db.exec("DELETE FROM sessions WHERE expires < ?", [Date.now()]);
 		await db.exec("DELETE FROM events WHERE ts < ?", [Date.now() - 30 * 24 * 3600 * 1000]);
 		await db.exec("DELETE FROM usage WHERE day < ?", [sydneyDay(Date.now() - 45 * 24 * 3600 * 1000)]);
+		await db.exec("DELETE FROM stats_hourly WHERE hour < ?", [Math.floor(Date.now() / 3600_000) - 24 * 14]);
 		// Throw away old guest accounts (they have no password and no saved data).
 		const old = Date.now() - 14 * 24 * 3600 * 1000;
 		await db.batch([
@@ -156,6 +186,33 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			"INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
 			[key, String(value)]
 		);
+	}
+
+	// ---------- apps (the launcher page) ----------
+	async function seedApps() {
+		const n = (await db.exec("SELECT COUNT(*) AS n FROM apps")).rows[0].n;
+		if (n === 0) await insertApps(readDefaultApps());
+	}
+	async function insertApps(list) {
+		if (!list.length) return 0;
+		const base = (await db.exec("SELECT COALESCE(MAX(sort),0) AS m FROM apps")).rows[0].m;
+		const rs = await db.batch(
+			list.map((a, i) => ["INSERT OR IGNORE INTO apps (name,url,category,sort,created) VALUES (?,?,?,?,?)", [a.name, a.url, a.category, base + i + 1, Date.now()]])
+		);
+		return rs.reduce((t, r) => t + r.affected, 0);
+	}
+	const listApps = async () => (await db.exec("SELECT id,name,url,category FROM apps ORDER BY sort,id")).rows;
+
+	// ---------- busy-hours history ----------
+	let hourBucket = { hour: Math.floor(Date.now() / 3600_000), conns: 0, users: 0, dirty: false };
+	function noteLoad(conns, users) {
+		const hour = Math.floor(Date.now() / 3600_000);
+		if (hour !== hourBucket.hour) hourBucket = { hour, conns: 0, users: 0, dirty: false };
+		if (conns > hourBucket.conns || users > hourBucket.users) {
+			hourBucket.conns = Math.max(hourBucket.conns, conns);
+			hourBucket.users = Math.max(hourBucket.users, users);
+			hourBucket.dirty = true;
+		}
 	}
 
 	// ---------- usage (seconds used today, Sydney time) ----------
@@ -185,6 +242,14 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			const [uid, day] = key.split(":");
 			if (day !== today && !m.dirty) usageMem.delete(key); // forget old days once saved
 			if (m.dirty) dirty.push([key, +uid, day, m]);
+		}
+		if (hourBucket.dirty) {
+			const b = hourBucket;
+			b.dirty = false;
+			db.exec(
+				"INSERT INTO stats_hourly (hour,peak_conns,peak_users) VALUES (?,?,?) ON CONFLICT(hour) DO UPDATE SET peak_conns=MAX(peak_conns,excluded.peak_conns), peak_users=MAX(peak_users,excluded.peak_users)",
+				[b.hour, b.conns, b.users]
+			).catch(() => (b.dirty = true));
 		}
 		if (!dirty.length) return;
 		const stmts = dirty.map(([, uid, day, m]) => [
@@ -227,7 +292,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				since: Date.now(),
 				lastBytes: 0,
 				bytes: 0,
-				activeAt: 0,
+				activeAt: Date.now(),
 			};
 			conns.set(c.id, c);
 			const done = () => conns.delete(c.id);
@@ -246,13 +311,13 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				const d = b - c.lastBytes;
 				c.lastBytes = b;
 				c.bytes = b;
-				if (d >= ACTIVE_BYTES) {
-					c.activeAt = now;
-					active.add(c.user.id);
-				}
+				if (d >= ACTIVE_BYTES) c.activeAt = now;
+				// Reading a page you just loaded counts too, so the clock follows real use.
+				if (now - c.activeAt < ACTIVE_GRACE_MS) active.add(c.user.id);
 				users.set(c.user.id, c.user);
 			}
 			for (const uid of active) addUsage(uid, elapsed);
+			noteLoad(conns.size, users.size);
 			// Enforce the daily limit for free accounts.
 			for (const [uid] of users) {
 				const u = await getUserById(uid).catch(() => null);
@@ -691,6 +756,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			if (path === "/api/password" && req.method === "POST") return (await apiPassword(req, res, ip, user), null);
 			if (path === "/api/logout-others" && req.method === "POST") return (await apiLogoutOthers(req, res, user), null);
 			if (path === "/api/delete-account" && req.method === "POST") return (await apiDeleteAccount(req, res, ip, user), null);
+			if (path === "/api/apps" && req.method === "GET") return (json(res, 200, { apps: await listApps() }), null);
 			if (path === "/api/data" && (req.method === "GET" || req.method === "PUT")) return (await apiData(req, res, user), null);
 			if (path.startsWith("/api/")) return (json(res, 404, { error: "not found" }), null);
 
@@ -940,6 +1006,79 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			state.announcement = t;
 			await setSetting("announcement", t);
 			events.log("announcement", "info", { detail: t ? "message set: " + t : "message cleared" });
+		},
+
+		// ---- apps page ----
+		listApps,
+		async addApp(a) {
+			const c = cleanApp(a);
+			if (!c) throw Object.assign(new Error("Needs a name and a web address."), { status: 400 });
+			if (!(await insertApps([c]))) throw Object.assign(new Error("That address is already in the list."), { status: 409 });
+		},
+		async updateApp(id, a) {
+			const c = cleanApp(a);
+			if (!c) throw Object.assign(new Error("Needs a name and a web address."), { status: 400 });
+			try {
+				await db.exec("UPDATE apps SET name=?,url=?,category=? WHERE id=?", [c.name, c.url, c.category, id]);
+			} catch {
+				throw Object.assign(new Error("That address is already in the list."), { status: 409 });
+			}
+		},
+		deleteApp: (id) => db.exec("DELETE FROM apps WHERE id=?", [id]),
+		// text lines: "Name | URL | Category"
+		async importApps(text) {
+			const list = [];
+			for (const line of String(text || "").split(/\r?\n/).slice(0, 500)) {
+				const [name, url, category] = line.split("|").map((x) => x.trim());
+				const c = cleanApp({ name, url, category });
+				if (c) list.push(c);
+			}
+			return { found: list.length, added: await insertApps(list) };
+		},
+		async restoreApps() {
+			return { added: await insertApps(readDefaultApps()) };
+		},
+
+		// ---- chart data: last 14 Sydney days + busy hours for the last 24h ----
+		async charts() {
+			await flushUsage().catch(() => {});
+			const DAY = 24 * 3600 * 1000;
+			const days = [];
+			for (let i = 13; i >= 0; i--) days.push(sydneyDay(Date.now() - i * DAY));
+			days.splice(0, days.length, ...[...new Set(days)]);
+			const first = days[0];
+			const nowH = Math.floor(Date.now() / 3600_000);
+			const [use, made, hrs] = await db.batch([
+				["SELECT day, COUNT(*) AS users, SUM(seconds) AS secs FROM usage WHERE day>=? AND seconds>0 GROUP BY day", [first]],
+				["SELECT created, guest FROM users WHERE created>=?", [Date.now() - 15 * DAY]],
+				["SELECT hour, peak_conns, peak_users FROM stats_hourly WHERE hour>?", [nowH - 24]],
+			]);
+			const byDay = Object.fromEntries(use.rows.map((r) => [r.day, r]));
+			const signups = Object.fromEntries(days.map((d) => [d, { accounts: 0, guests: 0 }]));
+			for (const r of made.rows) {
+				const d = signups[sydneyDay(r.created)];
+				if (d) r.guest ? d.guests++ : d.accounts++;
+			}
+			const hourMap = Object.fromEntries(hrs.rows.map((r) => [r.hour, r]));
+			if (hourBucket.hour > nowH - 24) {
+				const h = hourMap[hourBucket.hour] || { peak_conns: 0, peak_users: 0 };
+				hourMap[hourBucket.hour] = { peak_conns: Math.max(h.peak_conns, hourBucket.conns), peak_users: Math.max(h.peak_users, hourBucket.users) };
+			}
+			const hours = [];
+			for (let h = nowH - 23; h <= nowH; h++) {
+				const r = hourMap[h] || { peak_conns: 0, peak_users: 0 };
+				hours.push({ ts: h * 3600_000, conns: r.peak_conns, users: r.peak_users });
+			}
+			return {
+				days: days.map((d) => ({
+					day: d,
+					users: byDay[d] ? byDay[d].users : 0,
+					hours: byDay[d] ? Math.round((byDay[d].secs / 3600) * 10) / 10 : 0,
+					accounts: signups[d].accounts,
+					guests: signups[d].guests,
+				})),
+				hours,
+			};
 		},
 
 		// Everything worth keeping if the database were ever lost (no password hashes).

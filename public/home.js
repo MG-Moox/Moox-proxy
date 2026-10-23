@@ -533,6 +533,7 @@ const Home = (() => {
 		for (const b of document.querySelectorAll("[data-tool]")) {
 			b.addEventListener("click", () => {
 				const t = b.dataset.tool;
+				if (t === "apps") return Apps.open();
 				if (t === "calc") open("calc", "Calculator", buildCalculator);
 				else if (t === "timer") openTimer();
 				else if (t === "notes") open("notes", "Notes", buildNotes);
@@ -571,5 +572,11 @@ const Home = (() => {
 		showVersion();
 	}
 
-	return { init, renderGreeting, close, toolOpen: () => Boolean(openTool), calculate };
+	function openByName(t) {
+		if (t === "calc") open("calc", "Calculator", buildCalculator);
+		else if (t === "timer") openTimer();
+		else if (t === "notes") open("notes", "Notes", buildNotes);
+		else if (t === "weather") open("weather", "Weather", buildWeather);
+	}
+	return { init, renderGreeting, close, toolOpen: () => Boolean(openTool), calculate, openByName };
 })();

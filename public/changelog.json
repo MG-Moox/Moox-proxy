@@ -1,5 +1,18 @@
 [
 	{
+		"version": "2.3.0",
+		"date": "2026-10-23",
+		"changes": [
+			"Apps & games page with search, categories, a star to favorite, and a Surprise me button",
+			"Command palette: press Ctrl+K (or Cmd+K) to jump to anything",
+			"Reopen your last session's tabs, plus a row of recently visited sites on the home page",
+			"A \"time left\" badge shows your minutes, and reading a page now counts for a bit so guest and free time goes down correctly",
+			"Admin panel: new Apps tab to add, edit, delete, bulk import and restore the apps list",
+			"Admin panel: new Charts tab with daily users, hours browsed, sign-ups vs guests and busiest hours",
+			"Admin panel: guest controls, message banner, backups and the security log were added in earlier updates"
+		]
+	},
+	{
 		"version": "2.2.0",
 		"date": "2026-10-23",
 		"changes": [

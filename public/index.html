@@ -24,6 +24,7 @@
 		<script src="account.js" defer></script>
 		<script src="bg.js" defer></script>
 		<script src="home.js" defer></script>
+		<script src="apps.js" defer></script>
 		<script src="mobile.js" defer></script>
 		<script src="menu.js" defer></script>
 		<script src="app.js" defer></script>
@@ -44,12 +45,15 @@
 			<form id="bar-form">
 				<input id="bar-address" type="text" autocomplete="off" aria-label="Address" />
 			</form>
+			<button id="bar-time" class="time-pill" type="button" hidden title="Time left today"></button>
 			<button id="btn-fav" title="Add to favorites" aria-label="Favorite">&#9734;</button>
 			<button id="btn-menu" title="Menu (M)" aria-label="Menu" aria-haspopup="dialog" aria-expanded="false">&#9776;</button>
 		</header>
 
 		<main id="home">
 			<button id="btn-menu-home" class="corner" title="Menu (M)" aria-label="Menu" aria-haspopup="dialog" aria-expanded="false">&#9776;</button>
+
+			<button id="home-time" class="time-pill corner-left" type="button" hidden title="Time left today"></button>
 
 			<div id="clock" hidden>
 				<div id="clock-time"></div>
@@ -67,6 +71,7 @@
 			<pre id="error-code" class="err"></pre>
 
 			<section id="tools" aria-label="Tools">
+				<button type="button" class="chip" data-tool="apps"><span aria-hidden="true">&#127918;</span> Apps</button>
 				<button type="button" class="chip" data-tool="calc"><span aria-hidden="true">&#129518;</span> Calculator</button>
 				<button type="button" class="chip" data-tool="weather"><span aria-hidden="true">&#127780;&#65039;</span> Weather</button>
 				<button type="button" class="chip" data-tool="timer"><span aria-hidden="true">&#9201;&#65039;</span> Timer</button>
@@ -75,6 +80,10 @@
 
 			<section id="quick" aria-label="Quick links" hidden>
 				<div id="quick-grid"></div>
+			</section>
+
+			<section id="recent" aria-label="Recent sites" hidden>
+				<div id="recent-row"></div>
 			</section>
 
 			<section id="favs" aria-label="Favorites">

@@ -105,3 +105,11 @@ Add a monitor at uptimerobot.com for `https://YOUR-ADDRESS/health` every 5 minut
 - The version number at the bottom comes from `package.json`. Tap it to see what's new, which reads `public/changelog.json`. When you change something, add an entry at the top of that file and raise `version` in `package.json`.
 - Settings has animated backgrounds (flowing gradient, aurora, stars, snow, bubbles, fireflies), a custom accent colour, your own wallpaper picture, fonts, corner and tile styles, and a "Reduce motion" switch that freezes the animation.
 - On phones the menu is a bottom sheet, buttons are bigger, and "Edit favorites" shows rename, remove and move buttons. If Moox is opened inside the Google app or another in-app browser, a banner tells people to open it in Safari or Chrome.
+
+
+## Apps page, charts and palette (v2.3.0)
+
+- **Apps & games**: a launcher on the home page. The list lives in the database (seeded from `public/apps-default.json` the first time). Manage it in **/admin > Apps** (add, edit, delete, bulk import `Name | URL | Category`, restore defaults).
+- **Admin > Charts**: daily users, hours browsed, sign-ups vs guests, busiest hours (last 24h). Busy-hours history starts when 2.3.0 goes live.
+- **Ctrl+K** command palette, recent-sites row, and "Reopen last session" on the home page.
+- A "time left" badge shows remaining minutes; reading a page counts as active for 45 seconds.

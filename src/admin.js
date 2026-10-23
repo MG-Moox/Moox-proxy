@@ -147,6 +147,30 @@ export function createAdmin({ password, accounts, events }) {
 				await A.setAnnouncement(b.text);
 				return json(res, 200, { ok: true });
 			}
+			case "/admin/api/apps":
+				return json(res, 200, { apps: await A.listApps() });
+			case "/admin/api/app": {
+				const b = await readJson(req);
+				if (b.action === "add") await A.addApp(b);
+				else if (b.action === "update") await A.updateApp(parseInt(b.id, 10), b);
+				else if (b.action === "delete") await A.deleteApp(parseInt(b.id, 10));
+				else return json(res, 400, { error: "unknown action" });
+				audit(`apps: ${b.action} ${String(b.name || b.id || "").slice(0, 40)}`);
+				return json(res, 200, { ok: true });
+			}
+			case "/admin/api/apps/import": {
+				const b = await readJson(req);
+				const r = await A.importApps(b.text);
+				audit(`apps: imported ${r.added} of ${r.found}`);
+				return json(res, 200, r);
+			}
+			case "/admin/api/apps/restore": {
+				const r = await A.restoreApps();
+				audit(`apps: restored defaults (${r.added} added)`);
+				return json(res, 200, r);
+			}
+			case "/admin/api/charts":
+				return json(res, 200, await A.charts());
 			case "/admin/api/export": {
 				const data = await A.exportAll();
 				audit("downloaded a backup");
@@ -303,7 +327,7 @@ function showLogin() {
 }
 
 function start() {
-  var tabs = [["overview", "Overview"], ["live", "Live"], ["users", "Users"], ["codes", "Codes"], ["security", "Security"], ["controls", "Controls"]];
+  var tabs = [["overview", "Overview"], ["live", "Live"], ["users", "Users"], ["codes", "Codes"], ["apps", "Apps"], ["charts", "Charts"], ["security", "Security"], ["controls", "Controls"]];
   var nav = h("nav");
   tabs.forEach(function (t) {
     nav.append(h("button", { class: tab === t[0] ? "on" : "", onclick: function () { tab = t[0]; start(); } }, t[1]));
@@ -314,7 +338,7 @@ function start() {
       h("button", { onclick: function () { api("logout", {}).then(showLogin); } }, "Log out")),
     body);
   clearInterval(timer);
-  var render = { overview: rOverview, live: rLive, users: rUsers, codes: rCodes, security: rSecurity, controls: rControls }[tab];
+  var render = { overview: rOverview, live: rLive, users: rUsers, codes: rCodes, apps: rApps, charts: rCharts, security: rSecurity, controls: rControls }[tab];
   render(body);
   if (tab === "overview" || tab === "live") timer = setInterval(function () { render(body); }, 5000);
 }
@@ -322,6 +346,87 @@ function start() {
 function msg(kind, text) { return h("div", { class: "msg " + kind }, text); }
 function act(fn, after) {
   return function () { fn().then(after).catch(function (e) { alert(e.message); }); };
+}
+
+// ---------- apps page manager ----------
+function rApps(body) {
+  var out = h("div");
+  function load() {
+    api("apps").then(function (r) {
+      var nm = h("input", { placeholder: "Name", maxlength: "40" }), ur = h("input", { placeholder: "https://example.com", style: "flex:1;min-width:12rem" }), ct = h("input", { placeholder: "Category", maxlength: "24", value: "More", style: "width:9rem" });
+      var add = h("div", { class: "row" }, nm, ur, ct, h("button", { class: "pri", onclick: act(function () { return api("app", { action: "add", name: nm.value, url: ur.value, category: ct.value }); }, load) }, "Add"));
+      var bulk = h("textarea", { class: "codes", placeholder: "One per line:\nName | https://site.com | Category", style: "min-height:6rem;font-size:.85rem" });
+      var bulkRow = h("div", { class: "row" },
+        h("button", { onclick: function () { api("apps/import", { text: bulk.value }).then(function (x) { alert("Added " + x.added + " of " + x.found + " lines."); bulk.value = ""; load(); }).catch(function (e) { alert(e.message); }); } }, "Import list"),
+        h("button", { onclick: function () { if (confirm("Add back any default apps that were deleted?")) api("apps/restore", {}).then(function (x) { alert("Added " + x.added + "."); load(); }).catch(function (e) { alert(e.message); }); } }, "Restore defaults"));
+      var tb = h("tbody");
+      r.apps.forEach(function (a) {
+        var n = h("input", { value: a.name, maxlength: "40", style: "width:9rem" }), u = h("input", { value: a.url, style: "width:100%;min-width:10rem" }), c = h("input", { value: a.category, maxlength: "24", style: "width:7rem" });
+        tb.append(h("tr", null, h("td", null, n), h("td", null, u), h("td", null, c),
+          h("td", null, h("button", { class: "sm", onclick: act(function () { return api("app", { action: "update", id: a.id, name: n.value, url: u.value, category: c.value }); }, load) }, "Save"), " ",
+            h("button", { class: "sm dng", onclick: function () { if (confirm("Remove " + a.name + "?")) act(function () { return api("app", { action: "delete", id: a.id, name: a.name }); }, load)(); } }, "Delete"))));
+      });
+      out.replaceChildren(
+        h("div", { class: "card" }, h("h2", null, "Add an app or game"), add, h("p", { class: "mut" }, "These show on the Apps page for every signed-in user. " + r.apps.length + " listed.")),
+        h("div", { class: "card" }, h("h2", null, "Bulk import"), bulk, bulkRow),
+        h("div", { class: "card tw" }, h("h2", null, "All apps"), h("table", null, h("thead", null, h("tr", null, h("th", null, "Name"), h("th", null, "Address"), h("th", null, "Category"), h("th", null, ""))), tb)));
+    }).catch(function (e) { out.replaceChildren(msg("bad", e.message)); });
+  }
+  body.replaceChildren(out);
+  load();
+}
+
+// ---------- charts ----------
+var SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, text) {
+  var el = document.createElementNS(SVGNS, tag);
+  for (var k in attrs) el.setAttribute(k, attrs[k]);
+  if (text != null) el.textContent = text;
+  return el;
+}
+// bars: [{label, values:[n,...]}]; colors: one per series (stacked)
+function barChart(title, rows, colors, names) {
+  var W = 640, H = 200, L = 34, B = 22, T = 8, n = rows.length;
+  var max = 1;
+  rows.forEach(function (r) { var t = r.values.reduce(function (a, b) { return a + b; }, 0); if (t > max) max = t; });
+  max = Math.ceil(max);
+  var svg = sv("svg", { viewBox: "0 0 " + W + " " + H, width: "100%", role: "img", "aria-label": title });
+  [0, 0.5, 1].forEach(function (f) {
+    var y = T + (H - T - B) * (1 - f);
+    svg.append(sv("line", { x1: L, x2: W, y1: y, y2: y, stroke: "var(--line)" }));
+    svg.append(sv("text", { x: L - 4, y: y + 4, "text-anchor": "end", "font-size": 10, fill: "var(--mut)" }, String(Math.round(max * f * 10) / 10)));
+  });
+  var bw = (W - L) / n;
+  rows.forEach(function (r, i) {
+    var y = H - B, x = L + i * bw + bw * 0.15;
+    r.values.forEach(function (v, k) {
+      var hh = (v / max) * (H - T - B);
+      if (hh <= 0) return;
+      y -= hh;
+      var rect = sv("rect", { x: x, y: y, width: bw * 0.7, height: hh, fill: colors[k], rx: 2 });
+      rect.append(sv("title", {}, r.label + ": " + v + (names[k] ? " " + names[k] : "")));
+      svg.append(rect);
+    });
+    if (n <= 14 || i % 4 === 0) svg.append(sv("text", { x: x + bw * 0.35, y: H - 6, "text-anchor": "middle", "font-size": 10, fill: "var(--mut)" }, r.label));
+  });
+  var legend = h("div", { class: "mut", style: "font-size:.8rem" }, names.map(function (nm, k) {
+    return h("span", { style: "margin-right:1rem" }, h("span", { style: "display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.3rem;background:" + colors[k] }), nm);
+  }));
+  return h("div", { class: "card" }, h("h2", null, title), svg, legend);
+}
+function rCharts(body) {
+  var out = h("div");
+  body.replaceChildren(out);
+  api("charts").then(function (c) {
+    var short = function (d) { return d.slice(5); };
+    var hr = function (t) { return new Date(t).getHours() + "h"; };
+    out.replaceChildren(
+      barChart("People who used the proxy each day", c.days.map(function (d) { return { label: short(d.day), values: [d.users] }; }), ["var(--acc)"], ["people"]),
+      barChart("Hours of browsing each day", c.days.map(function (d) { return { label: short(d.day), values: [d.hours] }; }), ["var(--good)"], ["hours"]),
+      barChart("New accounts and guests each day", c.days.map(function (d) { return { label: short(d.day), values: [d.accounts, d.guests] }; }), ["var(--acc)", "var(--warn)"], ["accounts", "guests"]),
+      barChart("Busiest hours, last 24h (most people at once)", c.hours.map(function (x) { return { label: hr(x.ts), values: [x.users] }; }), ["var(--acc)"], ["people"]),
+      h("p", { class: "mut" }, "Days use Sydney time. People = accounts that browsed that day. Busy-hours history starts from when this version went live."));
+  }).catch(function (e) { out.replaceChildren(msg("bad", e.message)); });
 }
 
 // ---------- overview ----------

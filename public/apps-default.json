@@ -1,0 +1,202 @@
+[
+ {
+  "name": "YouTube",
+  "url": "https://www.youtube.com/",
+  "category": "Video & music"
+ },
+ {
+  "name": "Spotify",
+  "url": "https://open.spotify.com/",
+  "category": "Video & music"
+ },
+ {
+  "name": "Twitch",
+  "url": "https://www.twitch.tv/",
+  "category": "Video & music"
+ },
+ {
+  "name": "SoundCloud",
+  "url": "https://soundcloud.com/",
+  "category": "Video & music"
+ },
+ {
+  "name": "Vimeo",
+  "url": "https://vimeo.com/",
+  "category": "Video & music"
+ },
+ {
+  "name": "Reddit",
+  "url": "https://www.reddit.com/",
+  "category": "Social"
+ },
+ {
+  "name": "Discord",
+  "url": "https://discord.com/app",
+  "category": "Social"
+ },
+ {
+  "name": "Pinterest",
+  "url": "https://www.pinterest.com/",
+  "category": "Social"
+ },
+ {
+  "name": "Tumblr",
+  "url": "https://www.tumblr.com/",
+  "category": "Social"
+ },
+ {
+  "name": "Wikipedia",
+  "url": "https://en.wikipedia.org/",
+  "category": "Learn"
+ },
+ {
+  "name": "Khan Academy",
+  "url": "https://www.khanacademy.org/",
+  "category": "Learn"
+ },
+ {
+  "name": "Duolingo",
+  "url": "https://www.duolingo.com/",
+  "category": "Learn"
+ },
+ {
+  "name": "Wolfram Alpha",
+  "url": "https://www.wolframalpha.com/",
+  "category": "Learn"
+ },
+ {
+  "name": "Desmos",
+  "url": "https://www.desmos.com/calculator",
+  "category": "Learn"
+ },
+ {
+  "name": "Google",
+  "url": "https://www.google.com/",
+  "category": "Tools"
+ },
+ {
+  "name": "Google Maps",
+  "url": "https://www.google.com/maps",
+  "category": "Tools"
+ },
+ {
+  "name": "Google Translate",
+  "url": "https://translate.google.com/",
+  "category": "Tools"
+ },
+ {
+  "name": "GitHub",
+  "url": "https://github.com/",
+  "category": "Tools"
+ },
+ {
+  "name": "Wayback Machine",
+  "url": "https://web.archive.org/",
+  "category": "Tools"
+ },
+ {
+  "name": "BBC News",
+  "url": "https://www.bbc.com/news",
+  "category": "News"
+ },
+ {
+  "name": "ABC News",
+  "url": "https://www.abc.net.au/news",
+  "category": "News"
+ },
+ {
+  "name": "Hacker News",
+  "url": "https://news.ycombinator.com/",
+  "category": "News"
+ },
+ {
+  "name": "Chess.com",
+  "url": "https://www.chess.com/play/online",
+  "category": "Games"
+ },
+ {
+  "name": "Lichess",
+  "url": "https://lichess.org/",
+  "category": "Games"
+ },
+ {
+  "name": "2048",
+  "url": "https://play2048.co/",
+  "category": "Games"
+ },
+ {
+  "name": "Wordle",
+  "url": "https://www.nytimes.com/games/wordle/index.html",
+  "category": "Games"
+ },
+ {
+  "name": "Minecraft Classic",
+  "url": "https://classic.minecraft.net/",
+  "category": "Games"
+ },
+ {
+  "name": "GeoGuessr",
+  "url": "https://www.geoguessr.com/",
+  "category": "Games"
+ },
+ {
+  "name": "Skribbl.io",
+  "url": "https://skribbl.io/",
+  "category": "Games"
+ },
+ {
+  "name": "Agar.io",
+  "url": "https://agar.io/",
+  "category": "Games"
+ },
+ {
+  "name": "Slither.io",
+  "url": "http://slither.io/",
+  "category": "Games"
+ },
+ {
+  "name": "TypeRacer",
+  "url": "https://play.typeracer.com/",
+  "category": "Games"
+ },
+ {
+  "name": "Poki",
+  "url": "https://poki.com/",
+  "category": "Games"
+ },
+ {
+  "name": "CrazyGames",
+  "url": "https://www.crazygames.com/",
+  "category": "Games"
+ },
+ {
+  "name": "Coolmath Games",
+  "url": "https://www.coolmathgames.com/",
+  "category": "Games"
+ },
+ {
+  "name": "itch.io",
+  "url": "https://itch.io/games/browser",
+  "category": "Games"
+ },
+ {
+  "name": "Y8",
+  "url": "https://www.y8.com/",
+  "category": "Games"
+ },
+ {
+  "name": "Appetize (Android in browser)",
+  "url": "https://appetize.io/demo",
+  "category": "Android"
+ },
+ {
+  "name": "Now.gg",
+  "url": "https://now.gg/",
+  "category": "Android"
+ },
+ {
+  "name": "Android in browser (OS.gg)",
+  "url": "https://os.gg/",
+  "category": "Android"
+ }
+]

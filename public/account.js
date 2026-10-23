@@ -131,8 +131,27 @@ const Account = (() => {
 		box.hidden = false;
 	}
 
+	// Small "time left" badge: on the home page and in the top bar while browsing.
+	function drawPill() {
+		for (const id of ["home-time", "bar-time"]) {
+			const pill = document.getElementById(id);
+			if (!pill) continue;
+			if (!me || me.premium || me.remainingSeconds == null) {
+				pill.hidden = true;
+				continue;
+			}
+			const left = me.remainingSeconds;
+			pill.textContent = left <= 0 ? "No time left" : `\u23f1 ${dur(left)} left`;
+			pill.classList.toggle("low", left <= 300);
+			pill.title = (me.guest ? "Guest time" : "Free time") + " left today. Tap for details.";
+			pill.hidden = false;
+			pill.onclick = () => (typeof Menu !== "undefined" ? Menu.open("account") : null);
+		}
+	}
+
 	function draw() {
 		if (!me) return;
+		drawPill();
 		drawAnnouncement();
 		// Low-time banner
 		const left = me.remainingSeconds;
@@ -349,7 +368,7 @@ const Account = (() => {
 	}
 
 	function startPolling() {
-		pollTimer = setInterval(refresh, 30000);
+		pollTimer = setInterval(refresh, 15000);
 		document.addEventListener("visibilitychange", () => {
 			if (!document.hidden) refresh();
 		});
