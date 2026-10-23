@@ -58,12 +58,11 @@ html[data-text="xlarge"] { font-size: 137%; }
 * { box-sizing: border-box; }
 html { background: var(--bg); min-height: 100%; -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; }
-body { min-height: 100vh; min-height: 100dvh; overflow-x: clip; }
+body { min-height: 100vh; min-height: 100dvh; overflow-x: clip; display: flow-root; background: transparent; }
 /* One fixed layer paints the wallpaper so it always fills the screen, however far you scroll or zoom out */
 #bg-layer { position: fixed; inset: -2px; z-index: -1; pointer-events: none; background: var(--bg); }
 body {
 	font-family: system-ui, sans-serif;
-	background: var(--bg);
 	color: var(--fg);
 }
 html[data-font="readable"] body, html[data-font="readable"] button, html[data-font="readable"] input, html[data-font="readable"] select {
