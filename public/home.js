@@ -511,11 +511,31 @@ const Home = (() => {
 	function buildWeather(body) {
 		const out = el("div", { class: "weather-out", "aria-live": "polite" });
 		const city = el("input", { type: "text", maxlength: "60", placeholder: "City, e.g. Sydney", "aria-label": "City", autocomplete: "off" });
-		city.value = Settings.get("weatherCity");
+		let loc = Settings.get("weatherCity").startsWith("@") ? Settings.get("weatherCity") : "";
+		city.value = loc ? "" : Settings.get("weatherCity");
+		if (loc) city.placeholder = "Using your location";
+		const here = el("button", { type: "button", class: "btn", title: "Use my location", "aria-label": "Use my location", text: "\u{1F4CD}" });
+		here.addEventListener("click", () => {
+			if (!navigator.geolocation) return (out.textContent = "Your browser can't share a location.");
+			out.textContent = "Finding you…";
+			navigator.geolocation.getCurrentPosition(
+				(pos) => {
+					loc = "@" + pos.coords.latitude.toFixed(2) + "," + pos.coords.longitude.toFixed(2);
+					city.value = "";
+					city.placeholder = "Using your location";
+					show();
+				},
+				() => (out.textContent = "Couldn't get your location. Allow it in your browser, or type a city."),
+				{ timeout: 10000, maximumAge: 600000 }
+			);
+		});
+		city.addEventListener("input", () => {
+			loc = "";
+		});
 		const units = el("select", { "aria-label": "Units" }, el("option", { value: "c", text: "°C" }), el("option", { value: "f", text: "°F" }));
 		units.value = Settings.get("units");
 		const show = async () => {
-			const name = city.value.trim();
+			const name = city.value.trim() || loc;
 			if (name.length < 2) return (out.textContent = "Type a city name.");
 			out.textContent = "Loading…";
 			try {
@@ -541,8 +561,8 @@ const Home = (() => {
 				out.textContent = e.message;
 			}
 		};
-		body.append(el("form", { class: "btn-row", onsubmit: (e) => (e.preventDefault(), show()) }, city, units, el("button", { type: "submit", class: "btn primary", text: "Show" })), out);
-		if (city.value.trim()) show();
+		body.append(el("form", { class: "btn-row", onsubmit: (e) => (e.preventDefault(), show()) }, city, here, units, el("button", { type: "submit", class: "btn primary", text: "Show" })), out);
+		if (city.value.trim() || loc) show();
 		else setTimeout(() => city.focus(), 0);
 	}
 

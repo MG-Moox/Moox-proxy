@@ -48,6 +48,14 @@ function createTab() {
 function setActive(id) {
 	if (id === activeId) return;
 	activeId = id;
+	const lazy = tabs.find((t) => t.id === id && t.lazy && !t.frame);
+	if (lazy) {
+		lazy.lazy = false;
+		Menu.close();
+		updateView();
+		go(lazy.pinUrl || lazy.url);
+		return;
+	}
 	Menu.close();
 	Suggest.hide();
 	updateView();
@@ -166,9 +174,31 @@ const tabMenuKey = (e) => {
 		closeTabMenu();
 	}
 };
+// Pinned tabs are remembered in this browser and come back, ready to open, next time.
+const PIN_KEY = "moox:pinned";
+function savePinned() {
+	const list = tabs.filter((t) => t.pinned && (t.pinUrl || t.url)).map((t) => ({ url: t.pinUrl || t.url, title: String(t.title || "").slice(0, 80) }));
+	try {
+		localStorage.setItem(PIN_KEY, JSON.stringify(list.slice(0, 12)));
+	} catch {}
+}
+function restorePinned() {
+	let list = [];
+	try {
+		list = JSON.parse(localStorage.getItem(PIN_KEY) || "[]");
+	} catch {}
+	for (const p of Array.isArray(list) ? list.slice(0, 12) : []) {
+		if (!p || typeof p.url !== "string" || !/^https?:\/\//i.test(p.url)) continue;
+		tabs.push({ id: nextId++, frame: null, url: p.url, pinUrl: p.url, title: p.title || hostOf(p.url), retries: 0, starting: false, error: null, pinned: true, lazy: true });
+	}
+	activeId = null; // stay on the home page
+}
+
 function pinTab(t) {
 	t.pinned = !t.pinned;
+	t.pinUrl = t.pinned ? t.url : "";
 	tabs.sort((x, y) => Number(Boolean(y.pinned)) - Number(Boolean(x.pinned))); // stable: pinned first
+	savePinned();
 	renderTabs();
 }
 function closeTabsRightOf(t) {
@@ -241,10 +271,14 @@ function closeTab(id) {
 	const i = tabs.findIndex((t) => t.id === id);
 	if (i < 0) return;
 	const [tab] = tabs.splice(i, 1);
+	if (tab.pinned) savePinned();
 	if (tab.url) closedTabs.push(tab.url);
 	if (closedTabs.length > 10) closedTabs.shift();
 	if (tab.frame) tab.frame.frame.remove();
-	if (activeId === id) activeId = tabs.length ? tabs[Math.min(i, tabs.length - 1)].id : null;
+	if (activeId === id) {
+		const next = tabs[Math.min(i, tabs.length - 1)];
+		activeId = next && !(next.lazy && !next.frame) ? next.id : (tabs.find((t) => t.frame) || {}).id || null;
+	}
 	Menu.close();
 	Suggest.hide();
 	updateView();
@@ -501,6 +535,7 @@ function renderSiteError(tab) {
 
 // ---------- Drawing the current state ----------
 function renderTabs() {
+	savePinned();
 	tabList.textContent = "";
 	for (const t of tabs) {
 		const isActive = t.id === activeId;
@@ -607,7 +642,7 @@ function updateView() {
 // ---------- Recent sites + reopen last session (home page) ----------
 const SESSION_KEY = "moox:session";
 function saveSession() {
-	const urls = tabs.filter((t) => t.url).map((t) => t.url);
+	const urls = tabs.filter((t) => t.url && !t.pinned).map((t) => t.url);
 	if (!urls.length) return; // keep the last real session when everything is closed
 	try {
 		localStorage.setItem(SESSION_KEY, JSON.stringify(urls.slice(0, MAX_TABS)));
@@ -639,7 +674,7 @@ function renderRecent() {
 		items.push(h);
 		if (items.length >= 6) break;
 	}
-	const sess = tabs.length ? [] : lastSession();
+	const sess = tabs.some((t) => t.frame) ? [] : lastSession();
 	box.hidden = !Settings.get("recent") || (!items.length && !sess.length);
 	if (sess.length) {
 		const b = document.createElement("button");
@@ -972,6 +1007,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 updatePlaceholder();
+restorePinned();
+updateView();
 renderFavorites();
 renderRecent();
 renderClock();

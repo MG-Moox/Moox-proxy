@@ -3,7 +3,7 @@
 // The server asks Open-Meteo (a free weather service that needs no key) on your
 // behalf, so the browser never talks to it directly. The destination hosts are
 // fixed. Results are cached for 10 minutes.
-const GEO = (q) => `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`;
+const GEO = (q) => `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=en&format=json`;
 const FORECAST = (lat, lon, f) =>
 	`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
 	`&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day` +
@@ -43,7 +43,7 @@ export function createWeather(urls = { geo: GEO, forecast: FORECAST }) {
 	const cache = new Map();
 
 	async function getJson(url) {
-		const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+		const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
 		if (!r.ok) throw new Error("upstream " + r.status);
 		const text = await r.text();
 		if (text.length > MAX_BYTES) throw new Error("too big");
@@ -54,8 +54,20 @@ export function createWeather(urls = { geo: GEO, forecast: FORECAST }) {
 		const key = city.toLowerCase() + "|" + (fahrenheit ? "f" : "c");
 		const hit = cache.get(key);
 		if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-		const geo = await getJson(urls.geo(city));
-		const place = geo && Array.isArray(geo.results) ? geo.results[0] : null;
+		// "@lat,lon" comes from the "use my location" button
+		const ll = /^@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)$/.exec(city);
+		let place;
+		if (ll) {
+			const la = Number(ll[1]), lo = Number(ll[2]);
+			if (Math.abs(la) <= 90 && Math.abs(lo) <= 180) place = { name: "Your location", latitude: la, longitude: lo };
+		} else {
+			// "Hobart, Tasmania": search the first part, prefer a result that matches the rest
+			const [first, ...rest] = city.split(",");
+			const hint = rest.join(" ").trim().toLowerCase();
+			const geo = await getJson(urls.geo(first.trim() || city));
+			const results = geo && Array.isArray(geo.results) ? geo.results : [];
+			place = (hint && results.find((r) => [r.admin1, r.admin2, r.country, r.country_code].some((x) => x && String(x).toLowerCase().includes(hint)))) || results[0] || null;
+		}
 		let data = null;
 		if (place && Number.isFinite(place.latitude) && Number.isFinite(place.longitude)) {
 			const fc = await getJson(urls.forecast(place.latitude, place.longitude, fahrenheit));

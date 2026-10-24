@@ -1,5 +1,14 @@
 [
 	{
+		"version": "2.6.1",
+		"date": "2026-10-24",
+		"changes": [
+			"Weather: new 📍 button uses your location, and cities like \"Hobart, Tasmania\" now work",
+			"Weather waits longer for the service before giving up",
+			"Pinned tabs are remembered: they come back at the front next time you open Moox and load when you tap them"
+		]
+	},
+	{
 		"version": "2.6.0",
 		"date": "2026-10-24",
 		"changes": [
