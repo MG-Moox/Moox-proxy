@@ -133,6 +133,8 @@ const Apps = (() => {
 			["🌤️", "Weather", () => ctx.openTool("weather")],
 			["⏱️", "Timer & stopwatch", () => ctx.openTool("timer")],
 			["📝", "Notes", () => ctx.openTool("notes")],
+			["📐", "Unit converter", () => ctx.openTool("convert")],
+			["🎲", "Coin, dice & picker", () => ctx.openTool("fun")],
 			["⚙️", "Settings", () => ctx.openMenu("settings")],
 			["👤", "Account & time left", () => ctx.openMenu("account")],
 			["🕘", "History", () => ctx.openMenu("history")],
@@ -148,6 +150,7 @@ const Apps = (() => {
 	}
 	function sources() {
 		const out = actions();
+		for (const t of (ctx.listTabs ? ctx.listTabs() : [])) out.push({ kind: "Open tab", icon: "🗂️", label: t.title || ctx.hostOf(t.url), url: t.url, run: () => ctx.switchTab(t.id) });
 		const seen = new Set();
 		const add = (kind, name, url) => {
 			if (!url || seen.has(url)) return;

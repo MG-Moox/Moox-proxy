@@ -457,6 +457,97 @@ const Home = (() => {
 		setTimeout(() => area.focus(), 0);
 	}
 
+
+	// ---------- unit converter ----------
+	const UNITS = {
+		Length: { m: 1, km: 1000, cm: 0.01, mm: 0.001, mile: 1609.344, yard: 0.9144, foot: 0.3048, inch: 0.0254 },
+		Weight: { kg: 1, g: 0.001, lb: 0.45359237, oz: 0.028349523125, tonne: 1000 },
+		Volume: { L: 1, mL: 0.001, "cup (US)": 0.2365882365, "gal (US)": 3.785411784, "fl oz (US)": 0.0295735295625, tbsp: 0.0147867647813, tsp: 0.00492892159375 },
+		Speed: { "km/h": 1, mph: 1.609344, "m/s": 3.6, knot: 1.852 },
+		Time: { sec: 1, min: 60, hour: 3600, day: 86400, week: 604800 },
+		Temperature: null,
+	};
+	const TEMPS = ["°C", "°F", "K"];
+	function convertTemp(v, from, to) {
+		const c = from === "°C" ? v : from === "°F" ? (v - 32) / 1.8 : v - 273.15;
+		return to === "°C" ? c : to === "°F" ? c * 1.8 + 32 : c + 273.15;
+	}
+	function convertUnits(kind, v, from, to) {
+		if (kind === "Temperature") return convertTemp(v, from, to);
+		return (v * UNITS[kind][from]) / UNITS[kind][to];
+	}
+	function buildConvert(body) {
+		const kind = el("select", { "aria-label": "What to convert" }, ...Object.keys(UNITS).map((k) => el("option", { value: k, text: k })));
+		const amount = el("input", { type: "number", inputmode: "decimal", value: "1", step: "any", "aria-label": "Amount" });
+		const from = el("select", { "aria-label": "From" });
+		const to = el("select", { "aria-label": "To" });
+		const out = el("div", { class: "conv-out", role: "status" });
+		const fill = () => {
+			const names = kind.value === "Temperature" ? TEMPS : Object.keys(UNITS[kind.value]);
+			for (const s of [from, to]) s.textContent = "";
+			names.forEach((n) => {
+				from.append(el("option", { value: n, text: n }));
+				to.append(el("option", { value: n, text: n }));
+			});
+			to.selectedIndex = Math.min(1, names.length - 1);
+			calc();
+		};
+		const calc = () => {
+			const v = parseFloat(amount.value);
+			if (!Number.isFinite(v)) return (out.textContent = "Type a number.");
+			const r = convertUnits(kind.value, v, from.value, to.value);
+			out.textContent = `${v} ${from.value} = ${Number(r.toPrecision(8))} ${to.value}`;
+		};
+		kind.addEventListener("change", fill);
+		for (const x of [amount, from, to]) x.addEventListener("input", calc);
+		const swap = el("button", { type: "button", class: "btn", text: "⇅ Swap", onclick: () => {
+			const a = from.value;
+			from.value = to.value;
+			to.value = a;
+			calc();
+		} });
+		body.append(el("div", { class: "stack conv" }, kind, amount, from, to, swap, out));
+		fill();
+	}
+
+	// ---------- coin, dice, random, picker ----------
+	function buildFun(body) {
+		const out = el("div", { class: "fun-out", role: "status", "aria-live": "polite", text: "Tap something" });
+		const rnd = (n) => {
+			const a = new Uint32Array(1);
+			crypto.getRandomValues(a);
+			return a[0] % n;
+		};
+		const show = (t) => {
+			out.textContent = t;
+			out.classList.remove("pop");
+			void out.offsetWidth;
+			out.classList.add("pop");
+		};
+		const btn = (label, fn) => el("button", { type: "button", class: "btn", text: label, onclick: fn });
+		const min = el("input", { type: "number", value: "1", "aria-label": "Smallest number" });
+		const max = el("input", { type: "number", value: "100", "aria-label": "Biggest number" });
+		const list = el("textarea", { rows: "4", placeholder: "Pizza\nTacos\nSushi", "aria-label": "Choices, one per line" });
+		body.append(
+			out,
+			el("div", { class: "btn-row" },
+				btn("\u{1FA99} Coin", () => show(rnd(2) ? "Heads" : "Tails")),
+				btn("\u{1F3B2} Dice", () => show("\u{1F3B2} " + (rnd(6) + 1))),
+				btn("D20", () => show("D20: " + (rnd(20) + 1)))),
+			el("div", { class: "btn-row" }, min, max, btn("Random", () => {
+				let a = Math.trunc(Number(min.value)), b = Math.trunc(Number(max.value));
+				if (!Number.isFinite(a) || !Number.isFinite(b)) return show("Enter two numbers");
+				if (a > b) [a, b] = [b, a];
+				show(String(a + rnd(b - a + 1)));
+			})),
+			list,
+			btn("Pick one for me", () => {
+				const items = list.value.split("\n").map((s) => s.trim()).filter(Boolean);
+				show(items.length ? items[rnd(items.length)] : "Add some choices first");
+			})
+		);
+	}
+
 	// ---------- weather ----------
 	const WMO = (code, day = true) => {
 		if (code === 0) return day ? ["☀️", "Clear"] : ["🌙", "Clear"];
@@ -604,6 +695,8 @@ const Home = (() => {
 				else if (t === "timer") openTimer();
 				else if (t === "notes") open("notes", "Notes", buildNotes);
 				else if (t === "weather") open("weather", "Weather", buildWeather);
+				else if (t === "convert") open("convert", "Unit converter", buildConvert);
+				else if (t === "fun") open("fun", "Coin, dice & picker", buildFun);
 			});
 		}
 		$("weather-mini").addEventListener("click", () => open("weather", "Weather", buildWeather));
@@ -643,6 +736,8 @@ const Home = (() => {
 		else if (t === "timer") openTimer();
 		else if (t === "notes") open("notes", "Notes", buildNotes);
 		else if (t === "weather") open("weather", "Weather", buildWeather);
+		else if (t === "convert") open("convert", "Unit converter", buildConvert);
+		else if (t === "fun") open("fun", "Coin, dice & picker", buildFun);
 	}
-	return { init, renderGreeting, close, toolOpen: () => Boolean(openTool), calculate, openByName };
+	return { init, renderGreeting, close, toolOpen: () => Boolean(openTool), calculate, openByName, convertUnits };
 })();

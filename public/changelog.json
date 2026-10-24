@@ -1,5 +1,14 @@
 [
 	{
+		"version": "2.7.0",
+		"date": "2026-10-24",
+		"changes": [
+			"New Convert tool for length, weight, volume, speed, time and temperature",
+			"New Dice tool: coin flip, dice, a random number between two numbers, and a picker that chooses from your list",
+			"Ctrl+K now finds your open tabs and switches to them"
+		]
+	},
+	{
 		"version": "2.6.2",
 		"date": "2026-10-24",
 		"changes": [

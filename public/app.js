@@ -948,6 +948,8 @@ Apps.init({
 	makeIcon,
 	hostOf,
 	openTool: (n) => Home.openByName(n),
+	listTabs: () => tabs.filter((t) => t.url).map((t) => ({ id: t.id, title: t.title, url: t.url })),
+	switchTab: (id) => setActive(id),
 	openMenu: (n) => Menu.open(n),
 	newTab: newBlankTab,
 	reopenClosed: reopenClosedTab,

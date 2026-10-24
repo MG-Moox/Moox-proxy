@@ -565,3 +565,12 @@ html[data-motion="reduce"] #toast { transition: none; }
 .tabitem.pinned .tt { display: none; }
 .tabitem.pinned .tabbtn { padding: 0 .3rem; justify-content: center; }
 .tabitem { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+
+/* Extra tools */
+.conv { display: flex; flex-direction: column; gap: .5rem; } .conv select, .conv input { padding: .55rem; border: var(--bw) solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--fg); font-size: 1rem; }
+.conv-out { margin-top: .3rem; padding: .8rem; border-radius: 10px; background: var(--tile); font-size: 1.15rem; text-align: center; word-break: break-word; }
+.fun-out { margin: .2rem 0 .9rem; padding: 1rem; border-radius: 12px; background: var(--tile); font-size: 1.8rem; text-align: center; min-height: 3.4rem; word-break: break-word; }
+.fun-out.pop { animation: pop-in .25s ease-out; }
+#tool-body .btn-row { margin-bottom: .6rem; } #tool-body .btn-row input { width: 5.5rem; padding: .5rem; border: var(--bw) solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--fg); }
+#tool-body textarea:not(.notes) { width: 100%; padding: .55rem; margin-bottom: .6rem; border: var(--bw) solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--fg); font-size: 1rem; resize: vertical; }
+@media (max-width: 640px) { #tools { grid-template-columns: repeat(4, 1fr); } }
