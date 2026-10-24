@@ -1,6 +1,6 @@
 [
 	{
-		"version": "2.8.0",
+		"version": "2.4.0",
 		"date": "2026-10-24",
 		"changes": [
 			"Split view: show two pages at once, side by side on wide screens and stacked on a phone. Right-click a tab and choose Split view with this tab, or use Ctrl+K",
@@ -10,7 +10,7 @@
 		]
 	},
 	{
-		"version": "2.7.0",
+		"version": "2.3.8",
 		"date": "2026-10-24",
 		"changes": [
 			"New Convert tool for length, weight, volume, speed, time and temperature",
@@ -19,14 +19,14 @@
 		]
 	},
 	{
-		"version": "2.6.2",
+		"version": "2.3.7",
 		"date": "2026-10-24",
 		"changes": [
 			"Weather is more reliable: if the main weather service refuses or is slow, Moox switches to a backup source, and it shows the last good result instead of an error when it can"
 		]
 	},
 	{
-		"version": "2.6.1",
+		"version": "2.3.6",
 		"date": "2026-10-24",
 		"changes": [
 			"Weather: new 📍 button uses your location, and cities like \"Hobart, Tasmania\" now work",
@@ -35,7 +35,7 @@
 		]
 	},
 	{
-		"version": "2.6.0",
+		"version": "2.3.5",
 		"date": "2026-10-24",
 		"changes": [
 			"Right-click a tab (or press and hold on a phone) for a menu: New tab, Reload, Duplicate, Pin, Copy address, Add to favorites, Close, Close others, Close tabs to the right and Reopen closed tab",
@@ -43,7 +43,7 @@
 		]
 	},
 	{
-		"version": "2.5.2",
+		"version": "2.3.4",
 		"date": "2026-10-24",
 		"changes": [
 			"Search engine setting now marks Brave as recommended, with a note about why",
@@ -54,7 +54,7 @@
 		]
 	},
 	{
-		"version": "2.5.1",
+		"version": "2.3.3",
 		"date": "2026-10-24",
 		"changes": [
 			"When Google shows its robot check (which can't be solved from a server), Moox offers to run the same search on DuckDuckGo or switch your search engine",
@@ -62,7 +62,7 @@
 		]
 	},
 	{
-		"version": "2.5.0",
+		"version": "2.3.2",
 		"date": "2026-10-24",
 		"changes": [
 			"Daily fun fact under the title (switch it off in Settings)",
@@ -76,7 +76,7 @@
 		]
 	},
 	{
-		"version": "2.4.0",
+		"version": "2.3.1",
 		"date": "2026-10-24",
 		"changes": [
 			"Tab bar colors: Ocean, Sunset, Forest, Grape, Rose, Mint, Gold, Midnight, Graphite or pick your own",
