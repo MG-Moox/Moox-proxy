@@ -139,6 +139,8 @@ const Apps = (() => {
 			["👤", "Account & time left", () => ctx.openMenu("account")],
 			["🕘", "History", () => ctx.openMenu("history")],
 			["➕", "New tab", () => ctx.newTab()],
+			["◫", "Split view: open a page beside this one", () => ctx.besideSite && ctx.besideSite()],
+			["▭", "Close split view", () => ctx.endSplit && ctx.endSplit()],
 			["⛶", "Full screen (hide bars)", () => ctx.zen && ctx.zen()],
 			["⧉", "Duplicate this tab", () => ctx.duplicate && ctx.duplicate()],
 			["✖", "Close other tabs", () => ctx.closeOthers && ctx.closeOthers()],

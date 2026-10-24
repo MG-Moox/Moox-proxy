@@ -271,6 +271,7 @@ const Menu = (() => {
 		["Sunset", { theme: "dark", accent: "orange", bg: "flow", tabTheme: "sunset", tileStyle: "glass", corners: "round" }],
 		["Forest", { theme: "dark", accent: "green", bg: "fireflies", tabTheme: "forest", tileStyle: "glass", corners: "normal" }],
 		["Candy", { theme: "light", accent: "pink", bg: "bubbles", tabTheme: "rose", tileStyle: "solid", corners: "round" }],
+		["Gamer", { theme: "dark", accent: "red", bg: "grid", tabTheme: "gx", tileStyle: "glass", corners: "normal", gxbar: true }],
 		["Grape", { theme: "dark", accent: "purple", bg: "snow", tabTheme: "grape", tileStyle: "outline", corners: "normal" }],
 	];
 	function looksRow() {
@@ -312,9 +313,11 @@ const Menu = (() => {
 				Settings.get("bg") === "custom" ? selectRow("Dim my picture", "bgDim", [[0, "None"], [20, "A little"], [40, "Medium"], [60, "A lot"]], "Makes text easier to read on bright pictures.") : null,
 				selectRow("Font", "fontStyle", [["system", "Standard"], ["serif", "Serif"], ["mono", "Monospace"], ["rounded", "Rounded"]]),
 				selectRow("Corners", "corners", [["sharp", "Sharp"], ["normal", "Normal"], ["round", "Very round"]]),
-				selectRow("Tab bar colors", "tabTheme", [["auto", "Match theme"], ["ocean", "Ocean"], ["sunset", "Sunset"], ["forest", "Forest"], ["grape", "Grape"], ["rose", "Rose"], ["mint", "Mint"], ["gold", "Gold"], ["midnight", "Midnight"], ["graphite", "Graphite"], ["custom", "My color"]]),
+				selectRow("Tab bar colors", "tabTheme", [["auto", "Match theme"], ["gx", "Gamer red"], ["ocean", "Ocean"], ["sunset", "Sunset"], ["forest", "Forest"], ["grape", "Grape"], ["rose", "Rose"], ["mint", "Mint"], ["gold", "Gold"], ["midnight", "Midnight"], ["graphite", "Graphite"], ["custom", "My color"]]),
 				Settings.get("tabTheme") === "custom" ? tabColorRow() : null,
 				selectRow("Tab shape", "tabStyle", [["classic", "Classic"], ["pill", "Pills"], ["line", "Underline"]]),
+				toggleRow("Side bar with quick apps (gamer style)", "gxbar", "A strip on the left with Discord, Twitch, YouTube, Spotify and more. Tap one while browsing to open it beside your page."),
+				selectRow("Put unused tabs to sleep", "tabSleep", [[0, "Never"], [5, "After 5 minutes"], [15, "After 15 minutes"], [30, "After 30 minutes"]], "Sleeping tabs stop loading and using data. Tap one to wake it."),
 				toggleRow("Color stripe on each tab", "tabSiteColor", "Gives every website its own color so tabs are easy to tell apart."),
 				selectRow("Tile style", "tileStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"]]),
 				selectRow("Tile size", "tileSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"]])

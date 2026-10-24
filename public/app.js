@@ -47,10 +47,12 @@ function createTab() {
 
 function setActive(id) {
 	if (id === activeId) return;
+	if (split && id !== split.a && id !== split.b) split = null;
 	activeId = id;
 	const lazy = tabs.find((t) => t.id === id && t.lazy && !t.frame);
 	if (lazy) {
 		lazy.lazy = false;
+		lazy.asleep = false;
 		Menu.close();
 		updateView();
 		go(lazy.pinUrl || lazy.url);
@@ -228,6 +230,8 @@ function openTabMenu(t, x, y) {
 			renderFavorites();
 		}] : null,
 		["sep"],
+		t.frame && activeTab() && activeTab().frame && activeTab() !== t ? ["Split view with this tab", () => splitWithActive(t.id)] : null,
+		split && (split.a === t.id || split.b === t.id) ? ["Close split view", () => endSplit()] : null,
 		["Close tab", () => closeTab(t.id)],
 		tabs.length > 1 ? ["Close other tabs", () => { for (const o of tabs.slice()) if (o !== t && !o.pinned) closeTab(o.id); }] : null,
 		i < tabs.length - 1 ? ["Close tabs to the right", () => closeTabsRightOf(t)] : null,
@@ -261,6 +265,86 @@ function openTabMenu(t, x, y) {
 	menu.querySelector("button").focus();
 }
 
+// ---------- Split view (two pages side by side, or stacked on a phone) ----------
+let split = null; // { a: tabId, b: tabId }
+function startSplit(aId, bId) {
+	const A = tabs.find((t) => t.id === aId), B = tabs.find((t) => t.id === bId);
+	if (!A || !B || A === B || !A.frame || !B.frame) return false;
+	split = { a: aId, b: bId };
+	activeId = bId;
+	updateView();
+	return true;
+}
+function endSplit() {
+	split = null;
+	updateView();
+}
+function swapSplit() {
+	if (split) {
+		split = { a: split.b, b: split.a };
+		updateView();
+	}
+}
+// Opens a page next to the one you're looking at.
+async function openBeside(input) {
+	const first = activeTab();
+	if (!first || !first.frame) return go(input);
+	const prev = first.id;
+	await go(input, { newTab: true });
+	const nt = activeTab();
+	if (nt && nt.id !== prev) startSplit(prev, nt.id);
+}
+function splitWithActive(otherId) {
+	const cur = activeTab();
+	if (cur && cur.id !== otherId) startSplit(cur.id, otherId);
+}
+
+// ---------- Side bar (Opera GX style) ----------
+const SIDE_APPS = [
+	["Discord", "https://discord.com/app", "\u{1F4AC}"],
+	["Twitch", "https://www.twitch.tv/", "\u{1F7E3}"],
+	["YouTube", "https://www.youtube.com/", "\u25B6\uFE0F"],
+	["Spotify", "https://open.spotify.com/", "\u{1F3B5}"],
+	["Reddit", "https://www.reddit.com/", "\u{1F47E}"],
+	["Chess", "https://www.chess.com/play", "\u265F\uFE0F"],
+];
+function buildSideBar() {
+	const nav = $("gx-bar");
+	const mk = (icon, label, fn) => {
+		const b = document.createElement("button");
+		b.type = "button";
+		b.title = label;
+		b.setAttribute("aria-label", label);
+		b.textContent = icon;
+		b.addEventListener("click", (e) => fn(e));
+		return b;
+	};
+	nav.append(mk("\u{1F3AE}", "Apps and games", () => Apps.open()));
+	for (const [name, url, icon] of SIDE_APPS) {
+		nav.append(mk(icon, name + " (opens beside this page; Ctrl-click for a new tab)", (e) => (e.ctrlKey || e.metaKey ? go(url, { newTab: true }) : openBeside(url))));
+	}
+	nav.append(Object.assign(document.createElement("span"), { className: "gx-gap" }));
+	nav.append(mk("\u{1F4DD}", "Notes", () => Home.openByName("notes")));
+	nav.append(mk("\u{1F9EE}", "Calculator", () => Home.openByName("calc")));
+	nav.append(mk("\u2699\uFE0F", "Settings", () => Menu.open("settings")));
+}
+
+// ---------- Sleeping tabs (saves data; wake by tapping) ----------
+function sleepOldTabs() {
+	const mins = Settings.get("tabSleep");
+	if (!mins) return;
+	let changed = false;
+	for (const t of tabs) {
+		if (!t.frame || t.id === activeId || (split && (t.id === split.a || t.id === split.b))) continue;
+		if (Date.now() - (t.lastActive || 0) < mins * 60_000) continue;
+		t.frame.frame.remove();
+		Object.assign(t, { frame: null, lazy: true, retries: 0, starting: false, error: null, asleep: true });
+		changed = true;
+	}
+	if (changed) renderTabs();
+}
+setInterval(sleepOldTabs, 30_000);
+
 const closedTabs = [];
 function reopenClosedTab() {
 	const u = closedTabs.pop();
@@ -271,6 +355,7 @@ function closeTab(id) {
 	const i = tabs.findIndex((t) => t.id === id);
 	if (i < 0) return;
 	const [tab] = tabs.splice(i, 1);
+	if (split && (split.a === id || split.b === id)) split = null;
 	if (tab.pinned) savePinned();
 	if (tab.url) closedTabs.push(tab.url);
 	if (closedTabs.length > 10) closedTabs.shift();
@@ -582,6 +667,10 @@ function renderTabs() {
 		x.textContent = "×";
 		x.addEventListener("click", () => closeTab(t.id));
 
+		if (t.asleep && !t.frame) {
+			item.classList.add("asleep");
+			item.title = "Asleep. Tap to wake.";
+		}
 		if (t.pinned) {
 			item.classList.add("pinned");
 			x.hidden = true;
@@ -622,7 +711,28 @@ function updateView() {
 	tabStrip.hidden = tabs.length === 0;
 	bar.hidden = !browsing;
 	$("home").hidden = browsing;
-	for (const t of tabs) if (t.frame) t.frame.frame.hidden = t !== tab;
+	if (split && !(tabs.find((t) => t.id === split.a && t.frame) && tabs.find((t) => t.id === split.b && t.frame))) split = null;
+	const inSplit = Boolean(split && browsing && (activeId === split.a || activeId === split.b));
+	document.body.classList.toggle("split", inSplit);
+	for (const t of tabs) {
+		if (!t.frame) continue;
+		t.frame.frame.hidden = inSplit ? t.id !== split.a && t.id !== split.b : t !== tab;
+		t.frame.frame.classList.toggle("sp1", inSplit && t.id === split.a);
+		t.frame.frame.classList.toggle("sp2", inSplit && t.id === split.b);
+	}
+	if (tab) tab.lastActive = Date.now();
+	for (const [n, key] of [[1, "a"], [2, "b"]]) {
+		const head = $("sp-head" + n);
+		head.hidden = !inSplit;
+		if (!inSplit) continue;
+		const t = tabs.find((x) => x.id === split[key]);
+		head.classList.toggle("on", t.id === activeId);
+		const ti = head.querySelector(".sp-title");
+		ti.textContent = t.title || hostOf(t.url);
+		ti.onclick = () => setActive(t.id);
+		head.querySelector(".sp-swap").onclick = swapSplit;
+		head.querySelector(".sp-close").onclick = endSplit;
+	}
 	barAddress.value = browsing ? tab.url : "";
 	renderTabs();
 	renderSiteError(tab);
@@ -943,6 +1053,11 @@ Account.init({
 
 Home.init({ go, makeIcon, hostOf });
 $("zen-exit").addEventListener("click", () => setZen(false));
+buildSideBar();
+Settings.onChange((key) => {
+	if (key === "gxbar" || key === "*") $("gx-bar").hidden = !Settings.get("gxbar");
+});
+$("gx-bar").hidden = !Settings.get("gxbar");
 Apps.init({
 	go,
 	makeIcon,
@@ -954,6 +1069,11 @@ Apps.init({
 	newTab: newBlankTab,
 	reopenClosed: reopenClosedTab,
 	zen: toggleZen,
+	besideSite: () => {
+		const v = prompt("Address or search for the page to show beside this one:");
+		if (v && v.trim()) openBeside(v.trim());
+	},
+	endSplit,
 	duplicate: duplicateTab,
 	copyUrl,
 	closeOthers: closeOtherTabs,

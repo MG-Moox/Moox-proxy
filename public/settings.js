@@ -41,7 +41,9 @@ const Settings = (() => {
 		tools: [true, false],
 		recent: [true, false],
 		quote: [true, false],
-		tabTheme: ["auto", "ocean", "sunset", "forest", "grape", "rose", "mint", "gold", "midnight", "graphite", "custom"],
+		gxbar: [true, false],
+		tabSleep: [0, 5, 15, 30],
+		tabTheme: ["auto", "gx", "ocean", "sunset", "forest", "grape", "rose", "mint", "gold", "midnight", "graphite", "custom"],
 		tabStyle: ["classic", "pill", "line"],
 		tabSiteColor: [true, false],
 	};
@@ -78,6 +80,8 @@ const Settings = (() => {
 		tools: true,
 		recent: true,
 		quote: true,
+		gxbar: false,
+		tabSleep: 0,
 		tabTheme: "auto",
 		tabStyle: "classic",
 		tabSiteColor: true,
@@ -129,6 +133,7 @@ const Settings = (() => {
 		root.dataset.tiles = current.tileStyle;
 		root.dataset.tilesize = current.tileSize;
 		root.dataset.tabtheme = current.tabTheme;
+		root.dataset.gxbar = current.gxbar ? "on" : "off";
 		root.dataset.tabstyle = current.tabStyle;
 		root.dataset.tabsite = current.tabSiteColor ? "on" : "off";
 		if (current.tabTheme === "custom") {
