@@ -677,7 +677,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			favorites: Array.isArray(d.favorites) ? clean(d.favorites) : [],
 			history: Array.isArray(d.history) ? clean(d.history) : [],
 			settings: d.settings && typeof d.settings === "object" ? clean(d.settings) : {},
-			notes: typeof d.notes === "string" ? d.notes.slice(0, 8000) : "",
+			notes: typeof d.notes === "string" ? d.notes.slice(0, 60000) : "",
 		};
 		const text = JSON.stringify(out);
 		if (text.length > 300_000) return json(res, 413, { error: "too large" });

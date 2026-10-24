@@ -6,6 +6,7 @@ const Store = (() => {
 	const KEY_FAV = "moox:favorites";
 	const KEY_HIST = "moox:history";
 	const KEY_NOTES = "moox:notes";
+	const NOTES_MAX = 60000;
 	const MAX_HIST = 300;
 
 	function read(key) {
@@ -60,7 +61,7 @@ const Store = (() => {
 			write(KEY_HIST, hist);
 			if (data && typeof data.notes === "string") {
 				try {
-					localStorage.setItem(KEY_NOTES, data.notes.slice(0, 8000));
+					localStorage.setItem(KEY_NOTES, data.notes.slice(0, NOTES_MAX));
 				} catch {}
 			}
 		},
@@ -73,8 +74,33 @@ const Store = (() => {
 				return "";
 			}
 		},
+		// Notes can have several pages. They are saved as one string:
+		// plain text (old single note) or {"v":2,"cur":"id","pages":[{id,title,text}]}.
+		notesDoc() {
+			const raw = this.notes();
+			let doc = null;
+			if (raw.startsWith('{"v":2')) {
+				try {
+					doc = JSON.parse(raw);
+				} catch {}
+			}
+			if (!doc || !Array.isArray(doc.pages) || !doc.pages.length) {
+				doc = { v: 2, cur: "p1", pages: [{ id: "p1", title: "Page 1", text: raw.startsWith('{"v":2') ? "" : raw }] };
+			}
+			doc.pages = doc.pages.slice(0, 30).map((p, i) => ({ id: String(p.id || "p" + (i + 1)), title: String(p.title || "Page " + (i + 1)).slice(0, 40), text: String(p.text || "") }));
+			if (!doc.pages.some((p) => p.id === doc.cur)) doc.cur = doc.pages[0].id;
+			return doc;
+		},
+		// Returns false if it would not fit.
+		setNotesDoc(doc) {
+			const text = JSON.stringify(doc);
+			if (text.length > NOTES_MAX) return false;
+			this.setNotes(text);
+			return true;
+		},
+		notesLimit: NOTES_MAX,
 		setNotes(text) {
-			const t = String(text || "").slice(0, 8000);
+			const t = String(text || "").slice(0, NOTES_MAX);
 			try {
 				if (t === (localStorage.getItem(KEY_NOTES) || "")) return;
 				localStorage.setItem(KEY_NOTES, t);
@@ -211,7 +237,7 @@ const Store = (() => {
 			write(KEY_HIST, hist.slice(0, MAX_HIST));
 			if (typeof data.notes === "string" && data.notes && !this.notes()) {
 				try {
-					localStorage.setItem(KEY_NOTES, data.notes.slice(0, 8000));
+					localStorage.setItem(KEY_NOTES, data.notes.slice(0, NOTES_MAX));
 				} catch {}
 			}
 

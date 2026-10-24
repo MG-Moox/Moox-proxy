@@ -437,23 +437,87 @@ const Home = (() => {
 
 	// ---------- notes ----------
 	function buildNotes(body) {
+		let doc = Store.notesDoc();
 		let t = 0;
-		const status = el("p", { class: "hint", role: "status", text: "Saved on this device" + (typeof Account !== "undefined" && Account.enabled() && !Account.isGuest() ? " and your account." : ".") });
-		const area = el("textarea", { class: "notes", rows: "10", maxlength: "8000", placeholder: "Jot something down…", "aria-label": "Notes" });
-		area.value = Store.notes();
+		const page = () => doc.pages.find((p) => p.id === doc.cur);
+		const syncText = typeof Account !== "undefined" && Account.enabled() && !Account.isGuest() ? " and your account." : ".";
+		const status = el("p", { class: "hint", role: "status", text: "Saved on this device" + syncText });
+		const tabs = el("div", { class: "note-tabs", role: "tablist", "aria-label": "Note pages" });
+		const area = el("textarea", { class: "notes", rows: "9", placeholder: "Jot something down…", "aria-label": "Notes" });
+		const save = () => {
+			clearTimeout(t);
+			page().text = area.value;
+			const ok = Store.setNotesDoc(doc);
+			status.textContent = ok ? "Saved" : "Out of space. Delete some text or a page.";
+			return ok;
+		};
+		const draw = () => {
+			tabs.textContent = "";
+			for (const p of doc.pages) {
+				const b = el("button", { type: "button", class: "note-tab", role: "tab", "aria-selected": String(p.id === doc.cur), text: p.title, title: p.title });
+				b.addEventListener("click", () => {
+					if (p.id === doc.cur) return;
+					save();
+					doc.cur = p.id;
+					area.value = page().text;
+					draw();
+					area.focus();
+				});
+				tabs.append(b);
+			}
+			const add = el("button", { type: "button", class: "note-tab add", title: "New page", "aria-label": "New page", text: "+" });
+			add.addEventListener("click", () => {
+				if (doc.pages.length >= 30) return (status.textContent = "That's the most pages you can have (30).");
+				save();
+				let n = doc.pages.length + 1;
+				while (doc.pages.some((p) => p.title === "Page " + n)) n++;
+				const id = "p" + Date.now().toString(36);
+				doc.pages.push({ id, title: "Page " + n, text: "" });
+				doc.cur = id;
+				area.value = "";
+				Store.setNotesDoc(doc);
+				draw();
+				area.focus();
+			});
+			tabs.append(add);
+			const cur = tabs.querySelector('[aria-selected="true"]');
+			if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "nearest" });
+		};
+		const rename = el("button", { type: "button", class: "btn", text: "Rename" });
+		rename.addEventListener("click", () => {
+			const name = (prompt("Name for this page:", page().title) || "").trim().slice(0, 40);
+			if (!name) return;
+			page().title = name;
+			save();
+			draw();
+		});
+		const del = el("button", { type: "button", class: "btn", text: "Delete page" });
+		del.addEventListener("click", () => {
+			if (doc.pages.length < 2) {
+				if (confirm("Clear this page?")) {
+					area.value = "";
+					save();
+				}
+				return;
+			}
+			if (!confirm("Delete \u201c" + page().title + "\u201d? This can't be undone.")) return;
+			const i = doc.pages.findIndex((p) => p.id === doc.cur);
+			doc.pages.splice(i, 1);
+			doc.cur = doc.pages[Math.min(i, doc.pages.length - 1)].id;
+			area.value = page().text;
+			Store.setNotesDoc(doc);
+			draw();
+			status.textContent = "Page deleted";
+		});
+		area.value = page().text;
 		area.addEventListener("input", () => {
 			status.textContent = "Saving…";
 			clearTimeout(t);
-			t = setTimeout(() => {
-				Store.setNotes(area.value);
-				status.textContent = "Saved";
-			}, 500);
+			t = setTimeout(save, 500);
 		});
-		area.addEventListener("blur", () => {
-			clearTimeout(t);
-			Store.setNotes(area.value);
-		});
-		body.append(area, status);
+		area.addEventListener("blur", save);
+		body.append(tabs, area, el("div", { class: "btn-row note-actions" }, rename, del), status);
+		draw();
 		setTimeout(() => area.focus(), 0);
 	}
 

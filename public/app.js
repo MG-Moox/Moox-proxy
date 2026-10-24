@@ -301,13 +301,20 @@ function splitWithActive(otherId) {
 
 // ---------- Side bar (Opera GX style) ----------
 const SIDE_APPS = [
-	["Discord", "https://discord.com/app", "\u{1F4AC}"],
-	["Twitch", "https://www.twitch.tv/", "\u{1F7E3}"],
-	["YouTube", "https://www.youtube.com/", "\u25B6\uFE0F"],
-	["Spotify", "https://open.spotify.com/", "\u{1F3B5}"],
-	["Reddit", "https://www.reddit.com/", "\u{1F47E}"],
-	["Chess", "https://www.chess.com/play", "\u265F\uFE0F"],
+	["Discord", "https://discord.com/app"],
+	["Twitch", "https://www.twitch.tv/"],
+	["YouTube", "https://www.youtube.com/"],
+	["Spotify", "https://open.spotify.com/"],
+	["Reddit", "https://www.reddit.com/"],
+	["Chess.com", "https://www.chess.com/play"],
 ];
+// Simple line icons for Moox's own buttons (the sites use their real logos)
+const SIDE_SVG = {
+	apps: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+	notes: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h6"/></svg>',
+	calc: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>',
+	settings: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+};
 function buildSideBar() {
 	const nav = $("gx-bar");
 	const mk = (icon, label, fn) => {
@@ -315,18 +322,19 @@ function buildSideBar() {
 		b.type = "button";
 		b.title = label;
 		b.setAttribute("aria-label", label);
-		b.textContent = icon;
+		if (typeof icon === "string") b.innerHTML = SIDE_SVG[icon]; // fixed strings above, not user input
+		else b.append(icon);
 		b.addEventListener("click", (e) => fn(e));
 		return b;
 	};
-	nav.append(mk("\u{1F3AE}", "Apps and games", () => Apps.open()));
-	for (const [name, url, icon] of SIDE_APPS) {
-		nav.append(mk(icon, name + " (opens beside this page; Ctrl-click for a new tab)", (e) => (e.ctrlKey || e.metaKey ? go(url, { newTab: true }) : openBeside(url))));
+	nav.append(mk("apps", "Apps and games", () => Apps.open()));
+	for (const [name, url] of SIDE_APPS) {
+		nav.append(mk(makeIcon(url, true), name + " (opens beside this page; Ctrl-click for a new tab)", (e) => (e.ctrlKey || e.metaKey ? go(url, { newTab: true }) : openBeside(url))));
 	}
 	nav.append(Object.assign(document.createElement("span"), { className: "gx-gap" }));
-	nav.append(mk("\u{1F4DD}", "Notes", () => Home.openByName("notes")));
-	nav.append(mk("\u{1F9EE}", "Calculator", () => Home.openByName("calc")));
-	nav.append(mk("\u2699\uFE0F", "Settings", () => Menu.open("settings")));
+	nav.append(mk("notes", "Notes", () => Home.openByName("notes")));
+	nav.append(mk("calc", "Calculator", () => Home.openByName("calc")));
+	nav.append(mk("settings", "Settings", () => Menu.open("settings")));
 }
 
 // ---------- Sleeping tabs (saves data; wake by tapping) ----------

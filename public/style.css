@@ -612,3 +612,14 @@ body.split #sp-head2 { top: calc(var(--base) + (100% - var(--base)) / 2); left: 
 }
 body.split .site-frame.sp2 { border-top: 0; }
 body.split #site-error { display: none; }
+
+/* Notes pages */
+.note-tabs { display: flex; gap: .3rem; overflow-x: auto; padding-bottom: .4rem; margin-bottom: .4rem; scrollbar-width: thin; }
+.note-tab { flex: none; max-width: 9rem; padding: .3rem .7rem; border: var(--bw) solid var(--border); border-radius: 999px; background: var(--tile); color: inherit; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.note-tab.add { font-size: 1.1rem; line-height: 1; padding: .3rem .8rem; }
+.note-actions { margin-top: .5rem; }
+
+#gx-bar .ico { width: 1.7rem; height: 1.7rem; font-size: .85rem; border-radius: 8px; box-shadow: none; }
+#gx-bar .ico img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+#gx-bar button { color: var(--fg); }

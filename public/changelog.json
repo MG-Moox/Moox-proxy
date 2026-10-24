@@ -6,7 +6,9 @@
 			"Split view: show two pages at once, side by side on wide screens and stacked on a phone. Right-click a tab and choose Split view with this tab, or use Ctrl+K",
 			"Opera GX style side bar: Discord, Twitch, YouTube, Spotify, Reddit and Chess one tap away, opening beside your page (turn it on in Settings, or pick the Gamer look)",
 			"New Gamer look and a red Gamer tab bar color",
-			"Sleeping tabs: unused tabs can fall asleep after 5, 15 or 30 minutes to save data, and wake when you tap them"
+			"Sleeping tabs: unused tabs can fall asleep after 5, 15 or 30 minutes to save data, and wake when you tap them",
+			"Notes can now have several pages: add, rename, switch and delete them (your old note becomes Page 1)",
+			"The side bar uses the real site logos and clean icons instead of emojis"
 		]
 	},
 	{
