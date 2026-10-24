@@ -5,7 +5,7 @@
 // website is open, draws a single still frame if "Reduce motion" is on, and
 // never runs faster than 30 frames a second so it stays light on phones.
 const Backgrounds = (() => {
-	const MODES = new Set(["stars", "snow", "bubbles", "fireflies"]);
+	const MODES = new Set(["stars", "snow", "bubbles", "fireflies", "rain", "matrix", "sakura"]);
 	let canvas = null;
 	let ctx2d = null;
 	let parts = [];
@@ -29,6 +29,9 @@ const Backgrounds = (() => {
 		for (let i = 0; i < count; i++) {
 			if (mode === "stars") parts.push({ x: rnd(0, w), y: rnd(0, h), r: rnd(0.4, 1.8), p: rnd(0, 6.28), s: rnd(0.6, 2) });
 			else if (mode === "snow") parts.push({ x: rnd(0, w), y: rnd(0, h), r: rnd(1, 3.2), vy: rnd(18, 55), dx: rnd(-12, 12), p: rnd(0, 6.28) });
+			else if (mode === "rain") parts.push({ x: rnd(0, w), y: rnd(0, h), l: rnd(10, 26), vy: rnd(380, 700), dx: -60 });
+			else if (mode === "matrix") parts.push({ x: Math.floor(rnd(0, w) / 16) * 16, y: rnd(-h, h), vy: rnd(60, 190), n: 0 });
+			else if (mode === "sakura") parts.push({ x: rnd(0, w), y: rnd(0, h), r: rnd(3, 7), vy: rnd(22, 52), dx: rnd(-14, 4), p: rnd(0, 6.28), rot: rnd(0, 6.28) });
 			else if (mode === "bubbles") parts.push({ x: rnd(0, w), y: rnd(0, h), r: rnd(6, 26), vy: rnd(10, 34), p: rnd(0, 6.28) });
 			else parts.push({ x: rnd(0, w), y: rnd(0, h), r: rnd(1.5, 3.2), vx: rnd(-14, 14), vy: rnd(-14, 14), p: rnd(0, 6.28) });
 		}
@@ -64,6 +67,42 @@ const Backgrounds = (() => {
 				ctx2d.beginPath();
 				ctx2d.arc(p.x, p.y, p.r, 0, 6.283);
 				ctx2d.fill();
+			} else if (mode === "rain") {
+				p.y += p.vy * dt;
+				p.x += p.dx * dt;
+				if (p.y > h + 30) (p.y = -30), (p.x = rnd(0, w + 100));
+				ctx2d.globalAlpha = 0.35;
+				ctx2d.strokeStyle = colors.fg;
+				ctx2d.lineWidth = 1;
+				ctx2d.beginPath();
+				ctx2d.moveTo(p.x, p.y);
+				ctx2d.lineTo(p.x + (p.dx / p.vy) * p.l, p.y + p.l);
+				ctx2d.stroke();
+			} else if (mode === "matrix") {
+				p.y += p.vy * dt;
+				if (p.y > h + 20) (p.y = rnd(-200, 0)), (p.x = Math.floor(rnd(0, w) / 16) * 16);
+				ctx2d.font = "14px ui-monospace, Menlo, monospace";
+				for (let k = 0; k < 8; k++) {
+					ctx2d.globalAlpha = Math.max(0, 0.55 - k * 0.07);
+					ctx2d.fillStyle = k === 0 ? colors.fg : colors.accent;
+					const ch = String.fromCharCode(0x30a0 + ((((p.x * 7 + Math.floor(p.y / 16) * 13 - k * 5 + Math.floor(t * 3)) % 90) + 90) % 90));
+					ctx2d.fillText(ch, p.x, p.y - k * 16);
+				}
+			} else if (mode === "sakura") {
+				p.y += p.vy * dt;
+				p.x += (p.dx + Math.sin(t * 0.9 + p.p) * 18) * dt;
+				p.rot += dt * 1.2;
+				if (p.y > h + 10) (p.y = -10), (p.x = rnd(0, w));
+				if (p.x < -10) p.x = w + 10;
+				ctx2d.globalAlpha = 0.8;
+				ctx2d.fillStyle = "#f9a8d4";
+				ctx2d.save();
+				ctx2d.translate(p.x, p.y);
+				ctx2d.rotate(p.rot);
+				ctx2d.beginPath();
+				ctx2d.ellipse(0, 0, p.r, p.r * 0.55, 0, 0, 6.283);
+				ctx2d.fill();
+				ctx2d.restore();
 			} else if (mode === "bubbles") {
 				p.y -= p.vy * dt;
 				p.x += Math.sin(t * 0.8 + p.p) * 14 * dt;

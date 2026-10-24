@@ -112,6 +112,16 @@ const Menu = (() => {
 		["orange", "Orange", "#c2410c"],
 		["pink", "Pink", "#be185d"],
 		["red", "Red", "#dc2626"],
+		["teal", "Teal", "#0f766e"],
+		["cyan", "Cyan", "#0891b2"],
+		["indigo", "Indigo", "#4f46e5"],
+		["lime", "Lime", "#65a30d"],
+		["yellow", "Yellow", "#eab308"],
+		["rose", "Rose", "#e11d48"],
+		["slate", "Slate", "#475569"],
+		["gold", "Gold", "#b45309"],
+		["mint", "Mint", "#10b981"],
+		["violet", "Violet", "#9333ea"],
 	];
 
 	function tabColorRow() {
@@ -274,6 +284,20 @@ const Menu = (() => {
 		["Gamer", { theme: "dark", accent: "red", bg: "grid", tabTheme: "gx", tileStyle: "glass", corners: "normal", gxbar: true }],
 		["Grape", { theme: "dark", accent: "purple", bg: "snow", tabTheme: "grape", tileStyle: "outline", corners: "normal" }],
 	];
+	// Picks a random mix of every visual setting.
+	const SURPRISE_KEYS = ["palette", "accent", "bg", "fontStyle", "corners", "tileStyle", "tabTheme", "tabStyle", "titleStyle", "clockStyle", "iconStyle", "shadow", "borders", "clickFx"];
+	function surpriseRow() {
+		const b = el("button", { type: "button", class: "btn primary", text: "\u{1F3B2} Surprise me (random look)" });
+		b.addEventListener("click", () => {
+			for (const k of SURPRISE_KEYS) {
+				const list = Settings.options[k].filter((v) => v !== "custom" && !(k === "palette" && Math.random() < 0.4 && v !== "default"));
+				Settings.set(k, list[Math.floor(Math.random() * list.length)]);
+			}
+			render();
+		});
+		return el("div", { class: "btn-row" }, b, el("p", { class: "hint", text: "Don't like it? Tap again, or pick a Look above." }));
+	}
+
 	function looksRow() {
 		const wrap = el("div", { class: "looks" });
 		for (const [name, set] of LOOKS) {
@@ -292,35 +316,76 @@ const Menu = (() => {
 			el(
 				"fieldset",
 				{ class: "group" },
-				el("h3", { text: "Appearance" }),
+				el("h3", { text: "Looks and colors" }),
 				looksRow(),
-				selectRow("Theme", "theme", [["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]),
+				surpriseRow(),
+				selectRow("Theme", "theme", [["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]], Settings.get("palette") !== "default" ? "A color palette is on, so it decides light or dark. Set Palette to Default to use this." : null),
+				selectRow("Palette", "palette", [["default", "Default"], ["amoled", "Pure black (AMOLED)"], ["midnight", "Midnight blue"], ["nord", "Nord"], ["dracula", "Dracula"], ["forest", "Deep forest"], ["coffee", "Coffee"], ["terminal", "Green terminal"], ["solarized", "Solarized light"], ["sepia", "Sepia paper"], ["rose", "Rose"], ["lavender", "Lavender"], ["mint", "Mint"]]),
 				accentRow(),
-				colorRow(),
+				colorRow()
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Background" }),
 				selectRow("Home background", "bg", [
 					["plain", "Plain"],
 					["gradient", "Soft gradient"],
 					["aurora", "Aurora"],
+					["sunset", "Sunset"],
+					["ocean", "Ocean"],
+					["peach", "Peach"],
+					["mesh", "Color mesh"],
+					["cotton", "Cotton candy"],
+					["spotlight", "Spotlight"],
 					["grid", "Grid"],
+					["dots", "Dots"],
+					["stripes", "Stripes"],
+					["noise", "Film grain"],
 					["flow", "Flowing colors (animated)"],
 					["stars", "Twinkling stars (animated)"],
 					["snow", "Falling snow (animated)"],
+					["rain", "Rain (animated)"],
+					["matrix", "Code rain (animated)"],
+					["sakura", "Cherry blossoms (animated)"],
 					["bubbles", "Floating bubbles (animated)"],
 					["fireflies", "Fireflies (animated)"],
 					["custom", "My picture"],
 				]),
 				wallpaperRow(),
-				Settings.get("bg") === "custom" ? selectRow("Dim my picture", "bgDim", [[0, "None"], [20, "A little"], [40, "Medium"], [60, "A lot"]], "Makes text easier to read on bright pictures.") : null,
-				selectRow("Font", "fontStyle", [["system", "Standard"], ["serif", "Serif"], ["mono", "Monospace"], ["rounded", "Rounded"]]),
+				Settings.get("bg") === "custom" ? selectRow("Dim my picture", "bgDim", [[0, "None"], [20, "A little"], [40, "Medium"], [60, "A lot"]], "Makes text easier to read on bright pictures.") : null
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Style" }),
+				selectRow("Font", "fontStyle", [["system", "Standard"], ["clean", "Clean"], ["serif", "Serif"], ["slab", "Slab"], ["mono", "Monospace"], ["typewriter", "Typewriter"], ["rounded", "Rounded"], ["hand", "Handwriting"], ["condensed", "Condensed"], ["wide", "Wide"]]),
 				selectRow("Corners", "corners", [["sharp", "Sharp"], ["normal", "Normal"], ["round", "Very round"]]),
+				selectRow("Tile style", "tileStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"], ["neon", "Neon glow"], ["gradient", "Gradient"], ["soft", "Soft"]]),
+				selectRow("Tile size", "tileSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"]]),
+				selectRow("Site icons", "iconStyle", [["rounded", "Rounded"], ["circle", "Circles"], ["square", "Squares"]]),
+				selectRow("Borders", "borders", [["thin", "Thin"], ["none", "None"], ["thick", "Thick"]]),
+				selectRow("Shadows", "shadow", [["soft", "Soft"], ["none", "None"], ["strong", "Strong"]]),
+				selectRow("Click effect", "clickFx", [["off", "Off"], ["ripple", "Ripple"], ["sparkle", "Sparkle"]])
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Home layout" }),
+				selectRow("Page width", "homeWidth", [["narrow", "Narrow"], ["normal", "Normal"], ["wide", "Wide"]]),
+				selectRow("Title style", "titleStyle", [["gradient", "Gradient"], ["plain", "Plain"], ["neon", "Neon glow"], ["hidden", "Hidden"]]),
+				selectRow("Time look", "clockStyle", [["normal", "Normal"], ["big", "Big"], ["thin", "Thin"], ["mono", "Digital"]])
+			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Tabs" }),
 				selectRow("Tab bar colors", "tabTheme", [["auto", "Match theme"], ["gx", "Gamer red"], ["ocean", "Ocean"], ["sunset", "Sunset"], ["forest", "Forest"], ["grape", "Grape"], ["rose", "Rose"], ["mint", "Mint"], ["gold", "Gold"], ["midnight", "Midnight"], ["graphite", "Graphite"], ["custom", "My color"]]),
 				Settings.get("tabTheme") === "custom" ? tabColorRow() : null,
 				selectRow("Tab shape", "tabStyle", [["classic", "Classic"], ["pill", "Pills"], ["line", "Underline"]]),
-				toggleRow("Side bar with quick apps (gamer style)", "gxbar", "A strip on the left with Discord, Twitch, YouTube, Spotify and more. Tap one while browsing to open it beside your page."),
-				selectRow("Put unused tabs to sleep", "tabSleep", [[0, "Never"], [5, "After 5 minutes"], [15, "After 15 minutes"], [30, "After 30 minutes"]], "Sleeping tabs stop loading and using data. Tap one to wake it."),
 				toggleRow("Color stripe on each tab", "tabSiteColor", "Gives every website its own color so tabs are easy to tell apart."),
-				selectRow("Tile style", "tileStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"]]),
-				selectRow("Tile size", "tileSize", [["small", "Small"], ["normal", "Normal"], ["large", "Large"]])
+				toggleRow("Side bar with quick apps (gamer style)", "gxbar", "A strip on the left with Discord, Twitch, YouTube, Spotify and more. Tap one while browsing to open it beside your page."),
+				selectRow("Put unused tabs to sleep", "tabSleep", [[0, "Never"], [5, "After 5 minutes"], [15, "After 15 minutes"], [30, "After 30 minutes"]], "Sleeping tabs stop loading and using data. Tap one to wake it.")
 			),
 			el(
 				"fieldset",

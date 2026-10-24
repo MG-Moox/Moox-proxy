@@ -1153,3 +1153,23 @@ if (preset) {
 	homeAddress.value = preset;
 	go(preset);
 }
+
+// ---------- Click effects (Settings > Style > Click effect) ----------
+document.addEventListener("pointerdown", (e) => {
+	const fx = Settings.get("clickFx");
+	if (fx === "off" || document.documentElement.dataset.motion === "reduce") return;
+	const add = (cls, vars) => {
+		const d = document.createElement("span");
+		d.className = "fx " + cls;
+		d.style.left = e.clientX + "px";
+		d.style.top = e.clientY + "px";
+		for (const k in vars) d.style.setProperty(k, vars[k]);
+		document.body.append(d);
+		setTimeout(() => d.remove(), 800);
+	};
+	if (fx === "ripple") add("ripple");
+	else for (let i = 0; i < 8; i++) {
+		const ang = (i / 8) * 6.283 + Math.random() * 0.5, dist = 26 + Math.random() * 26;
+		add("spark", { "--dx": Math.cos(ang) * dist + "px", "--dy": Math.sin(ang) * dist + "px" });
+	}
+}, true);

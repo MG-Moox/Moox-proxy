@@ -4,7 +4,11 @@
 		"date": "2026-10-25",
 		"changes": [
 			"Notes can now have several pages: add, rename, switch and delete them (your old note becomes Page 1)",
-			"The side bar uses the real site logos and clean icons instead of emojis"
+			"The side bar uses the real site logos and clean icons instead of emojis",
+			"Way more looks: 12 color palettes (AMOLED black, Nord, Dracula, Solarized, Sepia, and more), 16 accent colors, 21 backgrounds including rain, code rain and cherry blossoms",
+			"New style options: 10 fonts, 6 tile styles, round/square/circle site icons, borders, shadows, click effects, page width, title style and clock style",
+			"A Surprise me button in Settings picks a random look from all of them",
+			"Fixed the tools bar on phones so the last row is centered when there is an odd number of buttons"
 		]
 	},
 	{

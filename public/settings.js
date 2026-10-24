@@ -19,8 +19,8 @@ const Settings = (() => {
 	// Allowed values for every setting. Anything else is ignored.
 	const OPTIONS = {
 		theme: ["system", "light", "dark"],
-		accent: ["blue", "green", "purple", "orange", "pink", "red", "custom"],
-		bg: ["plain", "gradient", "aurora", "grid", "flow", "stars", "snow", "bubbles", "fireflies", "custom"],
+		accent: ["blue", "green", "purple", "orange", "pink", "red", "teal", "cyan", "indigo", "lime", "yellow", "rose", "slate", "gold", "mint", "violet", "custom"],
+		bg: ["plain", "gradient", "aurora", "grid", "flow", "stars", "snow", "bubbles", "fireflies", "rain", "matrix", "sakura", "sunset", "ocean", "peach", "mesh", "cotton", "dots", "stripes", "noise", "spotlight", "custom"],
 		textSize: ["small", "normal", "large", "xlarge"],
 		engine: Object.keys(ENGINES),
 		clock: ["off", "12", "24"],
@@ -30,9 +30,9 @@ const Settings = (() => {
 		reduceMotion: [true, false],
 		showFavs: [true, false],
 		suggestions: [true, false],
-		fontStyle: ["system", "serif", "mono", "rounded"],
+		fontStyle: ["system", "serif", "mono", "rounded", "hand", "slab", "clean", "condensed", "wide", "typewriter"],
 		corners: ["sharp", "normal", "round"],
-		tileStyle: ["solid", "glass", "outline"],
+		tileStyle: ["solid", "glass", "outline", "neon", "gradient", "soft"],
 		tileSize: ["small", "normal", "large"],
 		bgDim: [0, 20, 40, 60],
 		units: ["c", "f"],
@@ -42,6 +42,14 @@ const Settings = (() => {
 		recent: [true, false],
 		quote: [true, false],
 		gxbar: [true, false],
+		palette: ["default", "amoled", "nord", "dracula", "solarized", "sepia", "midnight", "forest", "rose", "coffee", "lavender", "mint", "terminal"],
+		titleStyle: ["gradient", "plain", "neon", "hidden"],
+		clockStyle: ["normal", "big", "thin", "mono"],
+		shadow: ["soft", "none", "strong"],
+		borders: ["thin", "none", "thick"],
+		clickFx: ["off", "ripple", "sparkle"],
+		homeWidth: ["normal", "narrow", "wide"],
+		iconStyle: ["rounded", "circle", "square"],
 		tabSleep: [0, 5, 15, 30],
 		tabTheme: ["auto", "gx", "ocean", "sunset", "forest", "grape", "rose", "mint", "gold", "midnight", "graphite", "custom"],
 		tabStyle: ["classic", "pill", "line"],
@@ -81,6 +89,14 @@ const Settings = (() => {
 		recent: true,
 		quote: true,
 		gxbar: false,
+		palette: "default",
+		titleStyle: "gradient",
+		clockStyle: "normal",
+		shadow: "soft",
+		borders: "thin",
+		clickFx: "off",
+		homeWidth: "normal",
+		iconStyle: "rounded",
 		tabSleep: 0,
 		tabTheme: "auto",
 		tabStyle: "classic",
@@ -120,8 +136,17 @@ const Settings = (() => {
 
 	function apply() {
 		const root = document.documentElement;
-		const scheme = current.theme === "system" ? (dark && dark.matches ? "dark" : "light") : current.theme;
+		const LIGHT_PALETTES = ["solarized", "sepia", "rose", "lavender", "mint"];
+		const scheme = current.palette !== "default" ? (LIGHT_PALETTES.includes(current.palette) ? "light" : "dark") : current.theme === "system" ? (dark && dark.matches ? "dark" : "light") : current.theme;
 		root.dataset.scheme = scheme;
+		root.dataset.palette = current.palette;
+		root.dataset.title = current.titleStyle;
+		root.dataset.clockstyle = current.clockStyle;
+		root.dataset.shadow = current.shadow;
+		root.dataset.borders = current.borders;
+		root.dataset.clickfx = current.clickFx;
+		root.dataset.homewidth = current.homeWidth;
+		root.dataset.iconstyle = current.iconStyle;
 		root.dataset.accent = current.accent;
 		root.dataset.bg = current.bg;
 		root.dataset.text = current.textSize;
@@ -168,7 +193,7 @@ const Settings = (() => {
 		root.dataset.wall = current.bg === "custom" && wall ? "on" : "off";
 		// Phone browser chrome colour follows the theme.
 		const meta = document.querySelector('meta[name="theme-color"]');
-		if (meta) meta.setAttribute("content", scheme === "dark" ? "#111111" : "#ffffff");
+		if (meta) meta.setAttribute("content", getComputedStyle(root).getPropertyValue("--bg").trim() || (scheme === "dark" ? "#111111" : "#ffffff"));
 	}
 	if (dark && dark.addEventListener) dark.addEventListener("change", apply);
 	apply();
@@ -183,6 +208,7 @@ const Settings = (() => {
 
 	return {
 		engines: ENGINES,
+		options: OPTIONS,
 		zooms: ZOOMS,
 		defaults: DEFAULTS,
 
