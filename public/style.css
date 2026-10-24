@@ -547,3 +547,12 @@ html[data-contrast="high"] #home h1, html[data-bg="custom"][data-wall="on"] #hom
 #robot-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 55; width: min(40rem, calc(100% - 16px)); display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: .7rem .8rem; border-radius: 14px; background: var(--panel-bg); color: var(--fg); border: var(--bw) solid var(--border); box-shadow: var(--shadow); font-size: .85rem; }
 #robot-banner button { padding: .35rem .7rem; border: var(--bw) solid var(--border); border-radius: 999px; background: var(--tile); color: inherit; }
 #robot-banner button:first-of-type { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+/* Small details */
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); z-index: 95; padding: .5rem 1rem; border-radius: 999px; background: rgba(0, 0, 0, .8); color: #fff; font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#fav-grid .tile, #quick-grid .tile { animation: tile-in .35s ease-out both; }
+#fav-grid .tile:nth-child(2), #quick-grid .tile:nth-child(2) { animation-delay: .04s; } #fav-grid .tile:nth-child(3), #quick-grid .tile:nth-child(3) { animation-delay: .08s; }
+#fav-grid .tile:nth-child(4), #quick-grid .tile:nth-child(4) { animation-delay: .12s; } #fav-grid .tile:nth-child(n+5), #quick-grid .tile:nth-child(n+5) { animation-delay: .16s; }
+@keyframes tile-in { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
+html[data-motion="reduce"] #toast { transition: none; }

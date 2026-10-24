@@ -286,7 +286,7 @@ const Menu = (() => {
 	}
 
 	function renderSettings() {
-		const engines = Object.entries(Settings.engines).map(([k, v]) => [k, v.name]);
+		const engines = Object.entries(Settings.engines).map(([k, v]) => [k, k === "brave" ? v.name + " (recommended)" : v.name]);
 		body.append(
 			el(
 				"fieldset",
@@ -338,7 +338,7 @@ const Menu = (() => {
 				"fieldset",
 				{ class: "group" },
 				el("h3", { text: "Search" }),
-				selectRow("Search engine", "engine", engines, "Used when you type words instead of a website address."),
+				selectRow("Search engine", "engine", engines, "Used when you type words instead of a website address. Brave recommended: it works well from this server, while Google often shows a robot check."),
 				toggleRow("Search suggestions", "suggestions", "Shows ideas as you type. What you type is sent to DuckDuckGo or Google through your server.")
 			),
 			el(

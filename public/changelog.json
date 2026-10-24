@@ -1,5 +1,16 @@
 [
 	{
+		"version": "2.5.2",
+		"date": "2026-10-24",
+		"changes": [
+			"Search engine setting now marks Brave as recommended, with a note about why",
+			"The greeting has a sun or moon for the time of day",
+			"The browser tab title follows the page you are on",
+			"New \"Copy this page's address\" in Ctrl+K, with a small pop-up message",
+			"Favorites and quick links fade in one after another"
+		]
+	},
+	{
 		"version": "2.5.1",
 		"date": "2026-10-24",
 		"changes": [

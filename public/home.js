@@ -33,7 +33,8 @@ const Home = (() => {
 		const hr = new Date().getHours();
 		const part = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
 		const name = Settings.get("userName").trim() || (typeof Account !== "undefined" ? Account.username() : "");
-		box.textContent = name ? `${part}, ${name}` : part;
+		const emoji = hr < 5 ? "\u{1F319}" : hr < 12 ? "\u2600\uFE0F" : hr < 18 ? "\u{1F324}\uFE0F" : "\u{1F305}";
+		box.textContent = emoji + " " + (name ? `${part}, ${name}` : part);
 		renderQuote();
 	}
 

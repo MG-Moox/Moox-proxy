@@ -140,6 +140,7 @@ const Apps = (() => {
 			["⛶", "Full screen (hide bars)", () => ctx.zen && ctx.zen()],
 			["⧉", "Duplicate this tab", () => ctx.duplicate && ctx.duplicate()],
 			["✖", "Close other tabs", () => ctx.closeOthers && ctx.closeOthers()],
+			["🔗", "Copy this page's address", () => ctx.copyUrl && ctx.copyUrl()],
 			["⌨️", "Keyboard shortcuts", () => openHelp()],
 			["↩", "Reopen closed tab", () => ctx.reopenClosed && ctx.reopenClosed()],
 		];

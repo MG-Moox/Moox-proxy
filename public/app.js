@@ -116,6 +116,30 @@ function setZen(on) {
 function toggleZen() {
 	setZen(!document.body.classList.contains("zen"));
 }
+async function copyUrl() {
+	const t = activeTab();
+	if (!t || !t.url) return;
+	try {
+		await navigator.clipboard.writeText(t.url);
+		toast("Address copied");
+	} catch {
+		prompt("Copy this address:", t.url);
+	}
+}
+// A small message that fades away
+function toast(text) {
+	let el = document.getElementById("toast");
+	if (!el) {
+		el = document.createElement("div");
+		el.id = "toast";
+		el.setAttribute("role", "status");
+		document.body.append(el);
+	}
+	el.textContent = text;
+	el.classList.add("show");
+	clearTimeout(toast.t);
+	toast.t = setTimeout(() => el.classList.remove("show"), 1800);
+}
 function duplicateTab() {
 	const t = activeTab();
 	if (t && t.url) go(t.url, { newTab: true });
@@ -461,6 +485,7 @@ function updateView() {
 	if (!browsing) document.body.classList.remove("zen");
 	if (!browsing || !(tab && /\/sorry/.test(tab.url))) $("robot-banner").hidden = true;
 	$("zen-exit").hidden = !document.body.classList.contains("zen");
+	document.title = browsing && tab.title && tab.title !== "New tab" ? tab.title + " \u00b7 Moox Proxy" : "Moox Proxy";
 	saveSession();
 	if (!browsing) {
 		renderFavorites();
@@ -783,6 +808,7 @@ Apps.init({
 	reopenClosed: reopenClosedTab,
 	zen: toggleZen,
 	duplicate: duplicateTab,
+	copyUrl,
 	closeOthers: closeOtherTabs,
 });
 Backgrounds.init();
