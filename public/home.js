@@ -28,11 +28,56 @@ const Home = (() => {
 		const box = $("greeting");
 		if (!box) return;
 		box.hidden = !Settings.get("greeting") || document.body.classList.contains("browsing");
+		renderQuote();
 		if (box.hidden) return;
 		const hr = new Date().getHours();
 		const part = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
 		const name = Settings.get("userName").trim() || (typeof Account !== "undefined" ? Account.username() : "");
 		box.textContent = name ? `${part}, ${name}` : part;
+		renderQuote();
+	}
+
+	// ---------- daily fun fact (works offline, changes each day) ----------
+	const FACTS = [
+		"Honey never spoils. Edible honey has been found in 3,000-year-old tombs.",
+		"Octopuses have three hearts and blue blood.",
+		"A day on Venus is longer than its year.",
+		"Bananas are berries, but strawberries aren't.",
+		"Wombats make cube-shaped poo.",
+		"There are more trees on Earth than stars in the Milky Way, by some estimates.",
+		"The Eiffel Tower grows about 15 cm taller in summer heat.",
+		"Sharks are older than trees.",
+		"Tasmania has some of the cleanest air in the world.",
+		"A group of flamingos is called a flamboyance.",
+		"Lightning is about five times hotter than the surface of the Sun.",
+		"The first website is still online at info.cern.ch.",
+		"Sea otters hold hands while they sleep so they don't drift apart.",
+		"Your brain uses about 20% of your body's energy.",
+		"The shortest war in history lasted about 40 minutes.",
+		"Mount Everest grows a few millimetres every year.",
+		"Cows have best friends and get stressed when separated.",
+		"Water can boil and freeze at the same time (the triple point).",
+		"A snail can sleep for three years.",
+		"The Great Barrier Reef is the largest living structure on Earth.",
+		"Koalas have fingerprints almost identical to humans'.",
+		"The letter E is the most used letter in English.",
+		"Jellyfish have survived for over 500 million years.",
+		"Hot water can sometimes freeze faster than cold water.",
+		"Dolphins call each other by name using unique whistles.",
+		"A teaspoon of a neutron star would weigh about a billion tonnes.",
+		"Pineapples take about two years to grow.",
+		"Crows can remember human faces for years.",
+		"The Moon moves about 3.8 cm farther from Earth every year.",
+		"Antarctica is the driest continent.",
+		"Butterflies taste with their feet.",
+	];
+	function renderQuote() {
+		const box = $("quote");
+		if (!box) return;
+		box.hidden = !Settings.get("quote") || document.body.classList.contains("browsing");
+		if (box.hidden) return;
+		const day = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
+		box.textContent = "\u{1F4A1} " + FACTS[day % FACTS.length];
 	}
 
 	// ---------- quick links ----------

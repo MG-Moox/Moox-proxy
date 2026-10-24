@@ -264,6 +264,27 @@ const Menu = (() => {
 		];
 	}
 
+	const LOOKS = [
+		["Clean", { theme: "light", accent: "blue", bg: "plain", tabTheme: "auto", tileStyle: "solid", corners: "normal" }],
+		["Midnight", { theme: "dark", accent: "blue", bg: "stars", tabTheme: "midnight", tileStyle: "glass", corners: "round" }],
+		["Ocean", { theme: "dark", accent: "blue", bg: "aurora", tabTheme: "ocean", tileStyle: "glass", corners: "round" }],
+		["Sunset", { theme: "dark", accent: "orange", bg: "flow", tabTheme: "sunset", tileStyle: "glass", corners: "round" }],
+		["Forest", { theme: "dark", accent: "green", bg: "fireflies", tabTheme: "forest", tileStyle: "glass", corners: "normal" }],
+		["Candy", { theme: "light", accent: "pink", bg: "bubbles", tabTheme: "rose", tileStyle: "solid", corners: "round" }],
+		["Grape", { theme: "dark", accent: "purple", bg: "snow", tabTheme: "grape", tileStyle: "outline", corners: "normal" }],
+	];
+	function looksRow() {
+		const wrap = el("div", { class: "looks" });
+		for (const [name, set] of LOOKS) {
+			wrap.append(el("button", { type: "button", class: "chip", text: name, onclick: () => {
+				for (const [k, v] of Object.entries(set)) Settings.set(k, v);
+				body.dispatchEvent(new CustomEvent("looks"));
+				render();
+			} }));
+		}
+		return [el("p", { class: "hint", text: "One-tap looks (you can still tweak everything below):" }), wrap];
+	}
+
 	function renderSettings() {
 		const engines = Object.entries(Settings.engines).map(([k, v]) => [k, v.name]);
 		body.append(
@@ -271,6 +292,7 @@ const Menu = (() => {
 				"fieldset",
 				{ class: "group" },
 				el("h3", { text: "Appearance" }),
+				looksRow(),
 				selectRow("Theme", "theme", [["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]),
 				accentRow(),
 				colorRow(),
@@ -305,6 +327,7 @@ const Menu = (() => {
 				toggleRow("Greeting", "greeting"),
 				textRow("Name for the greeting", "userName", "Your name (optional)", 30),
 				toggleRow("Quick links (YouTube, Google...)", "quickLinks"),
+				toggleRow("Daily fun fact", "quote"),
 				toggleRow("Recent sites and reopen session", "recent"),
 				toggleRow("Tools (calculator, timer, notes, weather)", "tools"),
 				toggleRow("Favorites", "showFavs"),

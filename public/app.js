@@ -62,6 +62,22 @@ function newBlankTab() {
 	homeAddress.focus();
 }
 
+// ---------- Full screen (hides the tab bar and address bar) ----------
+function setZen(on) {
+	document.body.classList.toggle("zen", on);
+	$("zen-exit").hidden = !on || !document.body.classList.contains("browsing");
+}
+function toggleZen() {
+	setZen(!document.body.classList.contains("zen"));
+}
+function duplicateTab() {
+	const t = activeTab();
+	if (t && t.url) go(t.url, { newTab: true });
+}
+function closeOtherTabs() {
+	for (const t of tabs.slice()) if (t.id !== activeId) closeTab(t.id);
+}
+
 const closedTabs = [];
 function reopenClosedTab() {
 	const u = closedTabs.pop();
@@ -395,6 +411,8 @@ function updateView() {
 	renderTabs();
 	renderSiteError(tab);
 	updateFavButton();
+	if (!browsing) document.body.classList.remove("zen");
+	$("zen-exit").hidden = !document.body.classList.contains("zen");
 	saveSession();
 	if (!browsing) {
 		renderFavorites();
@@ -706,6 +724,7 @@ Account.init({
 });
 
 Home.init({ go, makeIcon, hostOf });
+$("zen-exit").addEventListener("click", () => setZen(false));
 Apps.init({
 	go,
 	makeIcon,
@@ -714,6 +733,9 @@ Apps.init({
 	openMenu: (n) => Menu.open(n),
 	newTab: newBlankTab,
 	reopenClosed: reopenClosedTab,
+	zen: toggleZen,
+	duplicate: duplicateTab,
+	closeOthers: closeOtherTabs,
 });
 Backgrounds.init();
 Account.onChange(() => Home.renderGreeting());
@@ -724,7 +746,10 @@ Suggest.attach(barAddress, (value) => go(value));
 
 // Keyboard shortcuts (only when you're not typing in a box)
 document.addEventListener("keydown", (event) => {
-	if (event.key === "Escape") return Menu.close();
+	if (event.key === "Escape") {
+		if (document.body.classList.contains("zen") && !Menu.isOpen()) return setZen(false);
+		return Menu.close();
+	}
 	if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "t") {
 		event.preventDefault();
 		return reopenClosedTab();

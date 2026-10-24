@@ -1,5 +1,19 @@
 [
 	{
+		"version": "2.5.0",
+		"date": "2026-10-24",
+		"changes": [
+			"Daily fun fact under the title (switch it off in Settings)",
+			"Gradient title, softer shadows and playful icon hover",
+			"Press ? for a list of keyboard shortcuts",
+			"One-tap Looks in Settings: Clean, Midnight, Ocean, Sunset, Forest, Candy and Grape change colors, background, tabs and tiles together",
+			"Search shortcuts: type yt cats, w moon, gh react, r topic, maps hobart, imdb, so, tw or sp followed by your words",
+			"Full screen mode hides the tab bar and address bar (Ctrl+K, then Full screen; Esc to leave)",
+			"Ctrl+K also has Duplicate this tab and Close other tabs",
+			"Fixed the colored band at the top of the home page on phones"
+		]
+	},
+	{
 		"version": "2.4.0",
 		"date": "2026-10-24",
 		"changes": [

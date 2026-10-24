@@ -137,6 +137,10 @@ const Apps = (() => {
 			["👤", "Account & time left", () => ctx.openMenu("account")],
 			["🕘", "History", () => ctx.openMenu("history")],
 			["➕", "New tab", () => ctx.newTab()],
+			["⛶", "Full screen (hide bars)", () => ctx.zen && ctx.zen()],
+			["⧉", "Duplicate this tab", () => ctx.duplicate && ctx.duplicate()],
+			["✖", "Close other tabs", () => ctx.closeOthers && ctx.closeOthers()],
+			["⌨️", "Keyboard shortcuts", () => openHelp()],
 			["↩", "Reopen closed tab", () => ctx.reopenClosed && ctx.reopenClosed()],
 		];
 		return a.map(([icon, label, run]) => ({ icon, label, run, kind: "Action" }));
@@ -218,9 +222,33 @@ const Apps = (() => {
 		if (!skipFocus && lastFocus && document.contains(lastFocus)) lastFocus.focus();
 	}
 
+	function openHelp() {
+		closePalette(true);
+		if (document.getElementById("help")) return;
+		const rows = [
+			["Ctrl / Cmd + K", "Command palette"], ["/", "Focus the address box"], ["M", "Menu"], ["T", "New tab"],
+			["Ctrl + Shift + T", "Reopen closed tab"], ["Esc", "Close menus, leave full screen"],
+			["yt cats, w moon, gh react", "Search shortcuts in the address box"], ["?", "This list"],
+		];
+		const card = el("div", { id: "help-card" }, el("h2", { text: "Keyboard shortcuts" }));
+		for (const [k, d] of rows) card.append(el("div", { class: "help-row" }, el("kbd", { text: k }), el("span", { text: d })));
+		const close = el("button", { type: "button", class: "chip", text: "Close" });
+		card.append(close);
+		const wrap = el("div", { id: "help", role: "dialog", "aria-modal": "true", "aria-label": "Keyboard shortcuts" }, card);
+		const done = () => { wrap.remove(); document.removeEventListener("keydown", esc, true); };
+		const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); done(); } };
+		document.addEventListener("keydown", esc, true);
+		close.addEventListener("click", done);
+		wrap.addEventListener("mousedown", (e) => { if (e.target === wrap) done(); });
+		document.body.append(wrap);
+		close.focus();
+	}
+
 	function init(context) {
 		ctx = { ...ctx, ...context };
 		document.addEventListener("keydown", (e) => {
+			const t = e.target;
+			if (e.key === "?" && !e.ctrlKey && !e.metaKey && !(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable))) return openHelp();
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
 				e.preventDefault();
 				openPalette();
