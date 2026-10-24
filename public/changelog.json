@@ -4,7 +4,7 @@
 		"date": "2026-10-24",
 		"changes": [
 			"When Google shows its robot check (which can't be solved from a server), Moox offers to run the same search on DuckDuckGo or switch your search engine",
-			"The daily fun fact is now labelled \"Tiny fact\""
+			"The daily fact on the home page is now labelled \"Fun fact\""
 		]
 	},
 	{
