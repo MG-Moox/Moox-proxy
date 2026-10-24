@@ -1,5 +1,12 @@
 [
 	{
+		"version": "2.5.1",
+		"date": "2026-10-24",
+		"changes": [
+			"When Google shows its robot check (which can't be solved from a server), Moox offers to run the same search on DuckDuckGo or switch your search engine"
+		]
+	},
+	{
 		"version": "2.5.0",
 		"date": "2026-10-24",
 		"changes": [

@@ -543,3 +543,7 @@ html[data-contrast="high"] #home h1, html[data-bg="custom"][data-wall="on"] #hom
 .help-row kbd { flex: none; min-width: 9rem; font: .8rem ui-monospace, Menlo, monospace; padding: .15rem .45rem; border-radius: 6px; background: var(--tile); }
 #help-card .chip { margin-top: .9rem; }
 @media (max-width: 640px) { .help-row { flex-direction: column; gap: .1rem; } .help-row kbd { min-width: 0; } }
+
+#robot-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 55; width: min(40rem, calc(100% - 16px)); display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: .7rem .8rem; border-radius: 14px; background: var(--panel-bg); color: var(--fg); border: var(--bw) solid var(--border); box-shadow: var(--shadow); font-size: .85rem; }
+#robot-banner button { padding: .35rem .7rem; border: var(--bw) solid var(--border); border-radius: 999px; background: var(--tile); color: inherit; }
+#robot-banner button:first-of-type { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }

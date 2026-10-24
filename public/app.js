@@ -62,6 +62,52 @@ function newBlankTab() {
 	homeAddress.focus();
 }
 
+// ---------- Google "I'm not a robot" page ----------
+// Google blocks many server/datacenter addresses. We can't solve their check,
+// so offer to run the same search somewhere that doesn't block this server.
+function checkRobotWall(url) {
+	const box = $("robot-banner");
+	let u;
+	try {
+		u = new URL(url);
+	} catch {
+		return;
+	}
+	if (!/(^|\.)google\.[a-z.]+$/.test(u.hostname) || !u.pathname.startsWith("/sorry")) {
+		box.hidden = true;
+		return;
+	}
+	let q = "";
+	try {
+		q = new URL(u.searchParams.get("continue") || "").searchParams.get("q") || "";
+	} catch {}
+	box.textContent = "";
+	const msg = document.createElement("span");
+	msg.textContent = "Google is asking for a robot check and blocks this server's address, so it can't be solved here. ";
+	const go1 = document.createElement("button");
+	go1.type = "button";
+	go1.textContent = q ? "Search \u201c" + q.slice(0, 24) + "\u201d on DuckDuckGo" : "Open DuckDuckGo";
+	go1.addEventListener("click", () => {
+		box.hidden = true;
+		go(q ? "https://duckduckgo.com/?q=" + encodeURIComponent(q) : "https://duckduckgo.com/");
+	});
+	const go2 = document.createElement("button");
+	go2.type = "button";
+	go2.textContent = "Use DuckDuckGo from now on";
+	go2.addEventListener("click", () => {
+		Settings.set("engine", "duckduckgo");
+		go2.textContent = "Done";
+		go2.disabled = true;
+	});
+	const x = document.createElement("button");
+	x.type = "button";
+	x.textContent = "\u00d7";
+	x.setAttribute("aria-label", "Dismiss");
+	x.addEventListener("click", () => (box.hidden = true));
+	box.append(msg, go1, go2, x);
+	box.hidden = false;
+}
+
 // ---------- Full screen (hides the tab bar and address bar) ----------
 function setZen(on) {
 	document.body.classList.toggle("zen", on);
@@ -170,6 +216,7 @@ function attachFrame(tab) {
 	f.addEventListener("urlchange", (event) => {
 		if (!isRealPage(event.url)) return;
 		tab.url = event.url;
+		checkRobotWall(event.url);
 		Store.addHistory(event.url, "");
 		if (tab.id === activeId) {
 			barAddress.value = event.url;
@@ -412,6 +459,7 @@ function updateView() {
 	renderSiteError(tab);
 	updateFavButton();
 	if (!browsing) document.body.classList.remove("zen");
+	if (!browsing || !(tab && /\/sorry/.test(tab.url))) $("robot-banner").hidden = true;
 	$("zen-exit").hidden = !document.body.classList.contains("zen");
 	saveSession();
 	if (!browsing) {
