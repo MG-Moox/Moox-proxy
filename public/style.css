@@ -556,3 +556,12 @@ html[data-contrast="high"] #home h1, html[data-bg="custom"][data-wall="on"] #hom
 #fav-grid .tile:nth-child(4), #quick-grid .tile:nth-child(4) { animation-delay: .12s; } #fav-grid .tile:nth-child(n+5), #quick-grid .tile:nth-child(n+5) { animation-delay: .16s; }
 @keyframes tile-in { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
 html[data-motion="reduce"] #toast { transition: none; }
+
+#tab-menu { position: fixed; z-index: 100; min-width: 12.5rem; padding: .3rem; border: var(--bw) solid var(--border); border-radius: 12px; background: var(--panel-bg); color: var(--fg); box-shadow: 0 14px 40px rgba(0, 0, 0, .35); animation: pop-in .12s ease-out; }
+#tab-menu button { display: block; width: 100%; padding: .5rem .7rem; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; font-size: .9rem; }
+#tab-menu button:hover, #tab-menu button:focus-visible { background: var(--hover); }
+#tab-menu hr { margin: .25rem .3rem; border: 0; border-top: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); }
+.tabitem.pinned { flex: 0 0 auto; min-width: 0; max-width: none; width: 2.6rem; }
+.tabitem.pinned .tt { display: none; }
+.tabitem.pinned .tabbtn { padding: 0 .3rem; justify-content: center; }
+.tabitem { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }

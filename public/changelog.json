@@ -1,5 +1,13 @@
 [
 	{
+		"version": "2.6.0",
+		"date": "2026-10-24",
+		"changes": [
+			"Right-click a tab (or press and hold on a phone) for a menu: New tab, Reload, Duplicate, Pin, Copy address, Add to favorites, Close, Close others, Close tabs to the right and Reopen closed tab",
+			"Pinned tabs shrink to just the site icon and stay at the front"
+		]
+	},
+	{
 		"version": "2.5.2",
 		"date": "2026-10-24",
 		"changes": [

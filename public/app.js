@@ -148,6 +148,89 @@ function closeOtherTabs() {
 	for (const t of tabs.slice()) if (t.id !== activeId) closeTab(t.id);
 }
 
+// ---------- Right-click (or press-and-hold) menu for tabs ----------
+function closeTabMenu() {
+	const m = document.getElementById("tab-menu");
+	if (m) m.remove();
+	document.removeEventListener("mousedown", tabMenuOutside, true);
+	document.removeEventListener("keydown", tabMenuKey, true);
+	window.removeEventListener("blur", closeTabMenu);
+}
+const tabMenuOutside = (e) => {
+	const m = document.getElementById("tab-menu");
+	if (m && !m.contains(e.target)) closeTabMenu();
+};
+const tabMenuKey = (e) => {
+	if (e.key === "Escape") {
+		e.stopPropagation();
+		closeTabMenu();
+	}
+};
+function pinTab(t) {
+	t.pinned = !t.pinned;
+	tabs.sort((x, y) => Number(Boolean(y.pinned)) - Number(Boolean(x.pinned))); // stable: pinned first
+	renderTabs();
+}
+function closeTabsRightOf(t) {
+	const i = tabs.indexOf(t);
+	for (const o of tabs.slice(i + 1)) if (!o.pinned) closeTab(o.id);
+}
+function openTabMenu(t, x, y) {
+	closeTabMenu();
+	const i = tabs.indexOf(t);
+	const items = [
+		["New tab", () => newBlankTab()],
+		t.frame ? ["Reload", () => t.frame.reload()] : null,
+		t.url ? ["Duplicate", () => go(t.url, { newTab: true })] : null,
+		["sep"],
+		[t.pinned ? "Unpin tab" : "Pin tab", () => pinTab(t)],
+		t.url ? ["Copy address", async () => {
+			try {
+				await navigator.clipboard.writeText(t.url);
+				toast("Address copied");
+			} catch {
+				prompt("Copy this address:", t.url);
+			}
+		}] : null,
+		t.url ? [Store.isFavorite(t.url) ? "Remove from favorites" : "Add to favorites", () => {
+			Store.toggleFavorite(t.url, t.title);
+			updateFavButton();
+			renderFavorites();
+		}] : null,
+		["sep"],
+		["Close tab", () => closeTab(t.id)],
+		tabs.length > 1 ? ["Close other tabs", () => { for (const o of tabs.slice()) if (o !== t && !o.pinned) closeTab(o.id); }] : null,
+		i < tabs.length - 1 ? ["Close tabs to the right", () => closeTabsRightOf(t)] : null,
+		closedTabs.length ? ["Reopen closed tab", () => reopenClosedTab()] : null,
+	].filter(Boolean);
+	const menu = document.createElement("div");
+	menu.id = "tab-menu";
+	menu.setAttribute("role", "menu");
+	for (const [label, fn] of items) {
+		if (label === "sep") {
+			menu.append(Object.assign(document.createElement("hr"), {}));
+			continue;
+		}
+		const b = document.createElement("button");
+		b.type = "button";
+		b.setAttribute("role", "menuitem");
+		b.textContent = label;
+		b.addEventListener("click", () => {
+			closeTabMenu();
+			fn();
+		});
+		menu.append(b);
+	}
+	document.body.append(menu);
+	const r = menu.getBoundingClientRect();
+	menu.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + "px";
+	menu.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 6)) + "px";
+	document.addEventListener("mousedown", tabMenuOutside, true);
+	document.addEventListener("keydown", tabMenuKey, true);
+	window.addEventListener("blur", closeTabMenu);
+	menu.querySelector("button").focus();
+}
+
 const closedTabs = [];
 function reopenClosedTab() {
 	const u = closedTabs.pop();
@@ -463,6 +546,33 @@ function renderTabs() {
 		x.setAttribute("aria-label", "Close tab: " + t.title);
 		x.textContent = "×";
 		x.addEventListener("click", () => closeTab(t.id));
+
+		if (t.pinned) {
+			item.classList.add("pinned");
+			x.hidden = true;
+		}
+		item.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			openTabMenu(t, e.clientX, e.clientY);
+		});
+		// Touch: press and hold
+		let hold = 0;
+		item.addEventListener("touchstart", (e) => {
+			const p = e.touches[0];
+			hold = setTimeout(() => {
+				hold = -1;
+				openTabMenu(t, p.clientX, p.clientY);
+			}, 550);
+		}, { passive: true });
+		const cancelHold = () => clearTimeout(hold > 0 ? hold : 0);
+		item.addEventListener("touchmove", cancelHold, { passive: true });
+		item.addEventListener("touchend", (e) => {
+			cancelHold();
+			if (hold === -1) {
+				e.preventDefault(); // don't also switch tab
+				hold = 0;
+			}
+		});
 
 		item.append(btn, x);
 		tabList.append(item);
