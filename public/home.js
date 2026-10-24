@@ -77,7 +77,7 @@ const Home = (() => {
 		box.hidden = !Settings.get("quote") || document.body.classList.contains("browsing");
 		if (box.hidden) return;
 		const day = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
-		box.textContent = "\u{1F4A1} " + FACTS[day % FACTS.length];
+		box.textContent = "\u{1F4A1} Tiny fact: " + FACTS[day % FACTS.length];
 	}
 
 	// ---------- quick links ----------
