@@ -1,5 +1,12 @@
 [
 	{
+		"version": "2.6.2",
+		"date": "2026-10-24",
+		"changes": [
+			"Weather is more reliable: if the main weather service refuses or is slow, Moox switches to a backup source, and it shows the last good result instead of an error when it can"
+		]
+	},
+	{
 		"version": "2.6.1",
 		"date": "2026-10-24",
 		"changes": [

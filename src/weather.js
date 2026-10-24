@@ -9,9 +9,13 @@ const FORECAST = (lat, lon, f) =>
 	`&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day` +
 	`&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=auto` +
 	(f ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
+// Backup forecast source (MET Norway) used if Open-Meteo refuses or is down.
+const METNO = (lat, lon) => `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
+const STALE_MS = 6 * 60 * 60 * 1000;
 const TTL_MS = 10 * 60 * 1000;
 const MAX_CACHE = 200;
 const MAX_BYTES = 64 * 1024;
+const MAX_BYTES_METNO = 600 * 1024;
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
 
@@ -39,15 +43,83 @@ export function shapeWeather(place, fc) {
 	};
 }
 
-export function createWeather(urls = { geo: GEO, forecast: FORECAST }) {
+const WMO_FROM_SYMBOL = (s) => {
+	s = String(s || "");
+	if (s.includes("thunder")) return 95;
+	if (s.includes("snow")) return 71;
+	if (s.includes("sleet")) return 67;
+	if (s.includes("heavyrain")) return 65;
+	if (s.includes("rain")) return s.includes("light") ? 61 : 63;
+	if (s.startsWith("fog")) return 45;
+	if (s.startsWith("clearsky")) return 0;
+	if (s.startsWith("fair")) return 1;
+	if (s.startsWith("partlycloudy")) return 2;
+	return 3;
+};
+
+// Turns a MET Norway forecast into the same shape as Open-Meteo's.
+export function shapeMetno(place, mj, fahrenheit) {
+	const ts = mj && mj.properties && mj.properties.timeseries;
+	if (!Array.isArray(ts) || !ts.length) return null;
+	const T = (c) => (fahrenheit ? c * 1.8 + 32 : c);
+	const W = (ms) => (fahrenheit ? ms * 2.23694 : ms * 3.6);
+	const offset = Math.round((place.longitude || 0) / 15) * 3600_000;
+	const first = ts[0].data.instant.details;
+	const sym = (e) => (e.data.next_1_hours || e.data.next_6_hours || e.data.next_12_hours || {}).summary;
+	const byDay = new Map();
+	for (const e of ts) {
+		const d = e.data.instant.details;
+		if (typeof d.air_temperature !== "number") continue;
+		const day = new Date(Date.parse(e.time) + offset).toISOString().slice(0, 10);
+		const g = byDay.get(day) || { max: -Infinity, min: Infinity, codes: [] };
+		g.max = Math.max(g.max, d.air_temperature);
+		g.min = Math.min(g.min, d.air_temperature);
+		const s = sym(e);
+		const lh = new Date(Date.parse(e.time) + offset).getUTCHours();
+		if (s && lh >= 9 && lh <= 17) g.codes.push(WMO_FROM_SYMBOL(s.symbol_code));
+		byDay.set(day, g);
+	}
+	const hour = new Date(Date.parse(ts[0].time) + offset).getUTCHours();
+	const s0 = sym(ts[0]);
+	const days = [...byDay.entries()].slice(0, 4).map(([date, g]) => ({
+		date,
+		code: g.codes.length ? Math.max(...g.codes) : s0 ? WMO_FROM_SYMBOL(s0.symbol_code) : 3,
+		max: num(T(g.max)),
+		min: num(T(g.min)),
+	}));
+	return {
+		place: String(place.name || "").slice(0, 80),
+		region: String(place.admin1 || place.country || "").slice(0, 80),
+		current: {
+			temp: num(T(first.air_temperature)),
+			feels: num(T(first.air_temperature)),
+			humidity: num(first.relative_humidity),
+			wind: num(W(first.wind_speed || 0)),
+			code: s0 ? WMO_FROM_SYMBOL(s0.symbol_code) : 3,
+			day: hour >= 6 && hour < 19,
+		},
+		days,
+	};
+}
+
+export function createWeather(urls = { geo: GEO, forecast: FORECAST, metno: METNO }) {
 	const cache = new Map();
 
-	async function getJson(url) {
-		const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+	async function getOnce(url, max = MAX_BYTES) {
+		const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { accept: "application/json", "user-agent": "MooxProxy/2 (personal weather widget; github.com/MG-Moox/Moox-proxy)" } });
 		if (!r.ok) throw new Error("upstream " + r.status);
 		const text = await r.text();
-		if (text.length > MAX_BYTES) throw new Error("too big");
+		if (text.length > max) throw new Error("too big");
 		return JSON.parse(text);
+	}
+	// One quick retry: shared server addresses are sometimes rate limited for a moment.
+	async function getJson(url, max) {
+		try {
+			return await getOnce(url, max);
+		} catch (e) {
+			await new Promise((r) => setTimeout(r, 700));
+			return getOnce(url, max);
+		}
 	}
 
 	async function lookup(city, fahrenheit) {
@@ -70,8 +142,16 @@ export function createWeather(urls = { geo: GEO, forecast: FORECAST }) {
 		}
 		let data = null;
 		if (place && Number.isFinite(place.latitude) && Number.isFinite(place.longitude)) {
-			const fc = await getJson(urls.forecast(place.latitude, place.longitude, fahrenheit));
-			data = shapeWeather(place, fc);
+			try {
+				data = shapeWeather(place, await getJson(urls.forecast(place.latitude, place.longitude, fahrenheit)));
+				if (!data) throw new Error("unexpected forecast format");
+			} catch (e) {
+				console.error("weather: Open-Meteo failed (" + e.message + "), trying MET Norway");
+				if (!urls.metno) throw e;
+				const mj = await getJson(urls.metno(place.latitude.toFixed(3), place.longitude.toFixed(3)), MAX_BYTES_METNO);
+				data = shapeMetno(place, mj, fahrenheit);
+				if (!data) throw e;
+			}
 		}
 		if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value);
 		cache.set(key, { at: Date.now(), data });
@@ -89,15 +169,30 @@ export function createWeather(urls = { geo: GEO, forecast: FORECAST }) {
 			body = { error: "Enter a city name." };
 		} else {
 			try {
-				const data = await lookup(city, f);
+				let data;
+				try {
+					data = await lookup(city, f);
+				} catch (e) {
+					console.error("weather: lookup failed:", e.message);
+					const old = cache.get(city.toLowerCase() + "|" + (f ? "f" : "c"));
+					if (old && old.data && Date.now() - old.at < STALE_MS) data = old.data; // better than nothing
+					else throw e;
+				}
 				if (data) body = { ok: true, ...data, units: f ? "f" : "c" };
 				else {
 					status = 404;
 					body = { error: "Couldn't find that place." };
 				}
-			} catch {
-				status = 502;
-				body = { error: "The weather service isn't answering right now." };
+			} catch (e) {
+				console.error("weather error:", e && e.message);
+				const old = cache.get(city.toLowerCase() + "|" + (f ? "f" : "c")); // stale copy is better than nothing
+				if (old && old.data) {
+					body = { ok: true, ...old.data, units: f ? "f" : "c" };
+				} else {
+					status = 502;
+					const why = e && e.message ? String(e.message).replace(/[^\w .:-]/g, "").slice(0, 40) : "";
+					body = { error: "The weather service isn't answering right now." + (why ? " (" + why + ")" : "") };
+				}
 			}
 		}
 		const text = JSON.stringify(body);
