@@ -121,7 +121,7 @@ function readDefaultApps() {
 	}
 }
 
-export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30, guestsPerIp = 10, defaultSignupMode = "open" }) {
+export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30, guestsPerIp = 10, defaultSignupMode = "open", freeMb = 300, guestMb = 100, premiumMb = 2000, monthMb = 4000 }) {
 	const limiter = createLimiter();
 	const FREE_SECONDS = Math.max(60, Math.round(freeMinutes * 60));
 	const GUEST_SECONDS = Math.max(60, Math.round(guestMinutes * 60));
@@ -132,7 +132,17 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		lockdown: false,
 		announcement: "",
 		guestsEnabled: true,
+		// Data caps in MB (0 = no cap). Protects the host's monthly bandwidth.
+		freeMb: Math.max(0, +freeMb || 0),
+		guestMb: Math.max(0, +guestMb || 0),
+		premiumMb: Math.max(0, +premiumMb || 0),
+		monthMb: Math.max(0, +monthMb || 0),
 	};
+	const MB = 1048576;
+	const bwMem = new Map(); // `${uid}:${day}` -> { bytes, delta, loaded }
+	const month = { key: sydneyDay().slice(0, 7), bytes: 0, loaded: false, alerted: false };
+	const capFor = (u) => (u && u.guest ? state.guestMb : isPremium(u) ? state.premiumMb : state.freeMb) * MB;
+	const budgetOut = () => state.monthMb > 0 && month.bytes >= state.monthMb * MB;
 	const bannedIps = new Map(); // ip -> reason
 	const sessionCache = new Map(); // hash -> { user|null, exp }
 	const usageMem = new Map(); // `${uid}:${day}` -> { seconds, dirty }
@@ -158,7 +168,10 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			if (r.key === "lockdown") state.lockdown = r.value === "1";
 			if (r.key === "announcement") state.announcement = String(r.value || "");
 			if (r.key === "guests") state.guestsEnabled = r.value !== "0";
+			const mb = { bw_free: "freeMb", bw_guest: "guestMb", bw_premium: "premiumMb", bw_month: "monthMb" }[r.key];
+			if (mb && Number.isFinite(+r.value) && +r.value >= 0) state[mb] = +r.value;
 		}
+		await loadMonth();
 		for (const r of (await db.exec("SELECT ip,reason FROM banned_ips")).rows) bannedIps.set(r.ip, r.reason || "");
 		await seedApps();
 		await maintenance();
@@ -171,11 +184,13 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		await db.exec("DELETE FROM sessions WHERE expires < ?", [Date.now()]);
 		await db.exec("DELETE FROM events WHERE ts < ?", [Date.now() - 30 * 24 * 3600 * 1000]);
 		await db.exec("DELETE FROM usage WHERE day < ?", [sydneyDay(Date.now() - 45 * 24 * 3600 * 1000)]);
+		await db.exec("DELETE FROM bandwidth WHERE day < ?", [sydneyDay(Date.now() - 45 * 24 * 3600 * 1000)]);
 		await db.exec("DELETE FROM stats_hourly WHERE hour < ?", [Math.floor(Date.now() / 3600_000) - 24 * 14]);
 		// Throw away old guest accounts (they have no password and no saved data).
 		const old = Date.now() - 14 * 24 * 3600 * 1000;
 		await db.batch([
 			["DELETE FROM usage WHERE user_id IN (SELECT id FROM users WHERE guest=1 AND created < ?)", [old]],
+			["DELETE FROM bandwidth WHERE user_id IN (SELECT id FROM users WHERE guest=1 AND created < ?)", [old]],
 			["DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE guest=1 AND created < ?)", [old]],
 			["DELETE FROM users WHERE guest=1 AND created < ?", [old]],
 		]);
@@ -268,6 +283,77 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		);
 	}
 
+	// ---------- data used (bytes moved through the proxy) ----------
+	async function loadMonth() {
+		month.key = sydneyDay().slice(0, 7);
+		const r = await db.exec("SELECT COALESCE(SUM(bytes),0) AS b FROM bandwidth WHERE day LIKE ?", [month.key + "%"]);
+		month.bytes = (r.rows[0] ? r.rows[0].b : 0) + pendingMonth();
+		month.loaded = true;
+		month.alerted = false;
+	}
+	const pendingMonth = () => {
+		let t = 0;
+		for (const [k, m] of bwMem) if (k.split(":")[1].startsWith(month.key)) t += m.delta;
+		return t;
+	};
+	async function bytesToday(uid) {
+		const key = `${uid}:${sydneyDay()}`;
+		let m = bwMem.get(key);
+		if (!m || !m.loaded) {
+			const r = await db.exec("SELECT bytes FROM bandwidth WHERE user_id=? AND day=?", [uid, sydneyDay()]);
+			m = bwMem.get(key) || { bytes: 0, delta: 0, loaded: false };
+			if (!m.loaded) {
+				m.bytes = (r.rows[0] ? r.rows[0].bytes : 0) + m.delta;
+				m.loaded = true;
+			}
+			bwMem.set(key, m);
+		}
+		return m.bytes;
+	}
+	function addBytes(uid, n) {
+		if (!(n > 0)) return;
+		const day = sydneyDay();
+		const key = `${uid}:${day}`;
+		let m = bwMem.get(key);
+		if (!m) bwMem.set(key, (m = { bytes: 0, delta: 0, loaded: false }));
+		m.bytes += n;
+		m.delta += n;
+		if (day.slice(0, 7) !== month.key) {
+			month.key = day.slice(0, 7);
+			month.bytes = 0;
+			month.alerted = false;
+		}
+		month.bytes += n;
+	}
+	async function flushBytes() {
+		const today = sydneyDay();
+		const rows = [];
+		for (const [key, m] of bwMem) {
+			const [uid, day] = key.split(":");
+			if (m.delta > 0) rows.push([key, +uid, day, m, m.delta]);
+			else if (day !== today) bwMem.delete(key);
+		}
+		if (!rows.length) return;
+		await db.batch(
+			rows.map(([, uid, day, , d]) => [
+				"INSERT INTO bandwidth (user_id,day,bytes) VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET bytes=bytes+excluded.bytes",
+				[uid, day, d],
+			])
+		);
+		for (const [, , , m, d] of rows) m.delta -= d;
+	}
+	async function setBytes(uid, bytes) {
+		const day = sydneyDay();
+		const key = `${uid}:${day}`;
+		const old = await bytesToday(uid);
+		bwMem.set(key, { bytes, delta: 0, loaded: true });
+		month.bytes = Math.max(0, month.bytes - old + bytes);
+		await db.exec(
+			"INSERT INTO bandwidth (user_id,day,bytes) VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET bytes=excluded.bytes",
+			[uid, day, bytes]
+		);
+	}
+
 	// ---------- live connection tracker ----------
 	const tracker = (() => {
 		const conns = new Map(); // id -> conn
@@ -295,7 +381,9 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				activeAt: Date.now(),
 			};
 			conns.set(c.id, c);
-			const done = () => conns.delete(c.id);
+			const done = () => {
+				if (conns.delete(c.id)) addBytes(c.user.id, (socket.bytesRead || 0) + (socket.bytesWritten || 0) - c.lastBytes);
+			};
 			socket.on("close", done);
 			socket.on("error", () => {});
 		}
@@ -310,6 +398,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				const b = (c.socket.bytesRead || 0) + (c.socket.bytesWritten || 0);
 				const d = b - c.lastBytes;
 				c.lastBytes = b;
+				addBytes(c.user.id, d);
 				c.bytes = b;
 				if (d >= ACTIVE_BYTES) c.activeAt = now;
 				// Reading a page you just loaded counts too, so the clock follows real use.
@@ -319,10 +408,23 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			for (const uid of active) addUsage(uid, elapsed);
 			noteLoad(conns.size, users.size);
 			// Enforce the daily limit for free accounts.
+			if (budgetOut() && conns.size) {
+				kickAll();
+				if (!month.alerted) {
+					month.alerted = true;
+					events.log("budget_reached", "alert", { detail: `monthly data budget of ${state.monthMb} MB used up: proxy paused until next month or until you raise it` });
+				}
+			}
 			for (const [uid] of users) {
 				const u = await getUserById(uid).catch(() => null);
 				if (!u) continue;
+				const cap = capFor(u);
 				if (u.banned) kickUser(uid);
+				else if (cap > 0 && (await bytesToday(uid)) >= cap) {
+					kickUser(uid);
+					if (once(`bw:${uid}:${sydneyDay()}`, 24 * 3600 * 1000))
+						events.log("data_limit", "info", { userId: uid, username: u.username, detail: "daily data limit reached" });
+				}
 				else if (!isPremium(u) && (await usedToday(uid)) >= limitFor(u)) {
 					kickUser(uid);
 					if (once(`limit:${uid}:${sydneyDay()}`, 24 * 3600 * 1000))
@@ -333,7 +435,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 
 		function start() {
 			timer = setInterval(() => tick().catch(() => {}), TICK_MS);
-			flushTimer = setInterval(() => flushUsage().catch(() => {}), FLUSH_MS);
+			flushTimer = setInterval(() => (flushUsage().catch(() => {}), flushBytes().catch(() => {})), FLUSH_MS);
 			timer.unref();
 			flushTimer.unref();
 		}
@@ -466,6 +568,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 	async function mePayload(user) {
 		const premium = isPremium(user);
 		const used = await usedToday(user.id);
+		const dataUsed = await bytesToday(user.id);
 		return {
 			username: user.username,
 			premium,
@@ -475,6 +578,10 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			usedSeconds: Math.min(used, premium ? used : limitFor(user)),
 			remainingSeconds: premium ? null : Math.max(0, limitFor(user) - used),
 			resetInSeconds: secondsUntilReset(),
+			dataLimitMb: capFor(user) / MB || null,
+			dataUsedMb: Math.round((dataUsed / MB) * 10) / 10,
+			dataLimited: capFor(user) > 0 && dataUsed >= capFor(user),
+			paused: budgetOut(),
 			limited: !premium && used >= limitFor(user),
 			day: sydneyDay(),
 			announcement: state.announcement,
@@ -657,6 +764,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			["DELETE FROM sessions WHERE user_id=?", [user.id]],
 			["DELETE FROM user_data WHERE user_id=?", [user.id]],
 			["DELETE FROM usage WHERE user_id=?", [user.id]],
+			["DELETE FROM bandwidth WHERE user_id=?", [user.id]],
 			["DELETE FROM users WHERE id=?", [user.id]],
 		]);
 		clearCache();
@@ -790,6 +898,8 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			}
 			if (state.lockdown) return { ok: false, status: 503 };
 			if (!isPremium(user) && (await usedToday(user.id)) >= limitFor(user)) return { ok: false, status: 429 };
+			if (budgetOut()) return { ok: false, status: 503 };
+			if (capFor(user) > 0 && (await bytesToday(user.id)) >= capFor(user)) return { ok: false, status: 429 };
 			return { ok: true, user, ip };
 		} catch {
 			return { ok: false, status: 503 };
@@ -837,6 +947,12 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				announcement: state.announcement,
 				freeMinutes: Math.round(FREE_SECONDS / 60),
 				guestMinutes: Math.round(GUEST_SECONDS / 60),
+				freeMb: state.freeMb,
+				guestMb: state.guestMb,
+				premiumMb: state.premiumMb,
+				monthMb: state.monthMb,
+				monthUsedMb: Math.round((month.bytes / MB) * 10) / 10,
+				monthKey: month.key,
 				uptimeSeconds: Math.round((now - startedAt) / 1000),
 				memoryMb: Math.round(process.memoryUsage().rss / 1048576),
 				day: sydneyDay(),
@@ -850,9 +966,10 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				await db.exec(
 					`SELECT u.id,u.username,u.guest,u.created,u.banned,u.ban_reason,u.premium_until,u.last_login,u.last_ip,u.signup_ip,
 					 (SELECT seconds FROM usage WHERE user_id=u.id AND day=?) AS today,
+					 (SELECT bytes FROM bandwidth WHERE user_id=u.id AND day=?) AS bw,
 					 (SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) AS sessions
 					 FROM users u WHERE u.username LIKE ? AND (u.guest=0 OR ?=1) ORDER BY u.id DESC LIMIT 200`,
-					[sydneyDay(), Date.now(), like, includeGuests ? 1 : 0]
+					[sydneyDay(), sydneyDay(), Date.now(), like, includeGuests ? 1 : 0]
 				)
 			).rows;
 			const day = sydneyDay();
@@ -862,6 +979,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				return {
 					...u,
 					today: mem ? mem.seconds : u.today || 0,
+					dataMb: Math.round((((bwMem.get(`${u.id}:${day}`) || {}).bytes ?? u.bw ?? 0) / MB) * 10) / 10,
 					premium: u.premium_until > Date.now(),
 					forever: u.premium_until >= FOREVER,
 					online: live.some((c) => c.userId === u.id),
@@ -900,6 +1018,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 						["DELETE FROM sessions WHERE user_id=?", [id]],
 						["DELETE FROM user_data WHERE user_id=?", [id]],
 						["DELETE FROM usage WHERE user_id=?", [id]],
+						["DELETE FROM bandwidth WHERE user_id=?", [id]],
 						["DELETE FROM users WHERE id=?", [id]],
 					]);
 					clearCache();
@@ -918,6 +1037,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 					break;
 				case "reset_usage":
 					await setUsage(id, 0);
+					await setBytes(id, 0);
 					events.log("usage_reset", "info", who);
 					break;
 				case "set_password": {
@@ -1000,6 +1120,19 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			events.log("lockdown", on ? "alert" : "info", { detail: on ? "lockdown ON: all proxy connections closed" : "lockdown off" });
 		},
 		kickAll: () => tracker.kickAll(),
+
+		async setLimits(b) {
+			const map = { freeMb: "bw_free", guestMb: "bw_guest", premiumMb: "bw_premium", monthMb: "bw_month" };
+			for (const k of Object.keys(map)) {
+				if (b[k] === undefined) continue;
+				const n = Math.round(Number(b[k]));
+				if (!Number.isFinite(n) || n < 0 || n > 10_000_000) throw Object.assign(new Error("bad number for " + k), { status: 400 });
+				state[k] = n;
+				await setSetting(map[k], n);
+			}
+			month.alerted = false;
+			events.log("data_limits", "info", { detail: `data limits set: free ${state.freeMb} MB, guest ${state.guestMb} MB, unlimited-plan ${state.premiumMb} MB per day, month ${state.monthMb} MB (0 = off)` });
+		},
 
 		async setAnnouncement(text) {
 			const t = String(text || "").trim().slice(0, 200);
@@ -1093,5 +1226,5 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		},
 	};
 
-	return { init, gate, authorizeUpgrade, tracker, admin, state, flushUsage, clearCache };
+	return { init, gate, authorizeUpgrade, tracker, admin, state, flushUsage: async () => (await flushUsage(), await flushBytes()), clearCache };
 }

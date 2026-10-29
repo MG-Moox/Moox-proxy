@@ -6,7 +6,9 @@
 			"Way more looks: 12 color palettes (AMOLED black, Nord, Dracula, Solarized, Sepia, and more), 16 accent colors, 21 backgrounds including rain, code rain and cherry blossoms",
 			"New style options: 10 fonts, 6 tile styles, round/square/circle site icons, borders, shadows, click effects, page width, title style and clock style",
 			"A Surprise me button in Settings picks a random look from all of them",
-			"Fixed the tools bar on phones so the last row is centered when there is an odd number of buttons"
+			"Fixed the tools bar on phones so the last row is centered when there is an odd number of buttons",
+			"Data limits: every account now has a daily data allowance (free 300 MB, guests 100 MB), plus a monthly budget for everyone so the host's bandwidth can't run out. You get a warning near the limit",
+			"Admin: new Data limits settings and a Data today column in Users"
 		]
 	},
 	{

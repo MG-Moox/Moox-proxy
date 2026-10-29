@@ -141,7 +141,7 @@ const Account = (() => {
 				continue;
 			}
 			const left = me.remainingSeconds;
-			pill.textContent = left <= 0 ? "No time left" : `\u23f1 ${dur(left)} left`;
+			pill.textContent = me.paused ? "Paused" : me.dataLimited ? "Data used up" : left <= 0 ? "No time left" : `\u23f1 ${dur(left)} left`;
 			pill.classList.toggle("low", left <= 300);
 			pill.title = (me.guest ? "Guest time" : "Free time") + " left today. Tap for details.";
 			pill.hidden = false;
@@ -160,10 +160,39 @@ const Account = (() => {
 				? `${dur(left)} of guest time left. Sign up for more, free.`
 				: `${dur(left)} of free time left today. It resets at midnight Sydney time.`;
 			banner.hidden = false;
+		} else if (me.dataLimitMb && !me.dataLimited && !me.paused && me.dataUsedMb >= me.dataLimitMb * 0.85) {
+			banner.textContent = `You've used ${Math.round(me.dataUsedMb)} of ${Math.round(me.dataLimitMb)} MB of data today. Videos and games use it fastest. It resets at midnight Sydney time.`;
+			banner.hidden = false;
 		} else banner.hidden = true;
 		// "Used up" screen
 		if (me.limited) showLimit();
+		else if (me.paused || me.dataLimited) showData();
 		else if (!overlay.hidden) overlay.hidden = true;
+	}
+
+	function showData() {
+		if (!overlay.hidden) return;
+		const countdown = el("strong");
+		const tick = () => (countdown.textContent = dur(resetIn()));
+		tick();
+		const timer = setInterval(() => {
+			if (overlay.hidden) return clearInterval(timer);
+			tick();
+			if (resetIn() <= 0) refresh();
+		}, 1000);
+		overlay.replaceChildren(
+			el(
+				"div",
+				{ class: "limit-card" },
+				el("h2", { id: "limit-title", text: me.paused ? "Moox is taking a break" : "You've used today's data" }),
+				me.paused
+					? el("p", { text: "Everyone together has used this month's data allowance, so the proxy is paused to keep it running all month. It comes back at the start of next month." })
+					: el("p", {}, `You've moved ${Math.round(me.dataUsedMb)} MB today (the limit is ${Math.round(me.dataLimitMb)} MB). It resets in `, countdown, " (midnight Sydney time)."),
+				el("p", { class: "muted", text: "Videos, music and games use the most data." }),
+				el("button", { type: "button", class: "btn", text: "Log out", onclick: () => (location.href = "/logout") })
+			)
+		);
+		overlay.hidden = false;
 	}
 
 	function showLimit() {
@@ -280,7 +309,8 @@ const Account = (() => {
 					: el("p", {
 							class: "hint",
 							text: `${dur(me.usedSeconds)} used of ${dur(me.limitSeconds)} today. Resets in ${dur(resetIn())} (midnight Sydney time).`,
-					  })
+					  }),
+				me.dataLimitMb ? el("p", { class: "hint", text: `Data: ${Math.round(me.dataUsedMb)} of ${Math.round(me.dataLimitMb)} MB used today.` }) : null
 			),
 			me.premium && me.premiumUntil === "never"
 				? null

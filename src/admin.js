@@ -142,6 +142,11 @@ export function createAdmin({ password, accounts, events }) {
 				await A.setGuests(Boolean(b.on));
 				return json(res, 200, { ok: true });
 			}
+			case "/admin/api/limits": {
+				const b = await readJson(req);
+				await A.setLimits(b);
+				return json(res, 200, { ok: true });
+			}
 			case "/admin/api/announcement": {
 				const b = await readJson(req);
 				await A.setAnnouncement(b.text);
@@ -480,7 +485,7 @@ function rUsers(body) {
   var list = h("div");
   function load() {
     api("users?q=" + encodeURIComponent(q.value) + (gcb.checked ? "&guests=1" : "")).then(function (d) {
-      var t = h("table", null, h("thead", null, h("tr", null, ["User", "Status", "Today", "Last login", "Signed up", "Actions"].map(function (x) { return h("th", null, x); }))));
+      var t = h("table", null, h("thead", null, h("tr", null, ["User", "Status", "Today", "Data today", "Last login", "Signed up", "Actions"].map(function (x) { return h("th", null, x); }))));
       var tb = h("tbody");
       d.users.forEach(function (u) {
         var status = [];
@@ -495,6 +500,7 @@ function rUsers(body) {
           h("td", null, h("b", null, u.username), h("div", { class: "mut mono" }, "#" + u.id + (u.guest ? " · guest" : ""))),
           h("td", null, status),
           h("td", null, fmtDur(u.today)),
+          h("td", null, (u.dataMb || 0) + " MB"),
           h("td", null, fmtTime(u.last_login), h("div", { class: "mut mono" }, u.last_ip || "")),
           h("td", null, fmtTime(u.created), h("div", { class: "mut mono" }, u.signup_ip || "")),
           h("td", null,
@@ -603,6 +609,11 @@ function rControls(body) {
       var modes = [["open", "Open: anyone can sign up"], ["code", "Code only: a code is needed to sign up"], ["closed", "Closed: nobody new can sign up"]];
       var mRow = h("div", { class: "row" });
       modes.forEach(function (m) { mRow.append(h("button", { class: s.signupMode === m[0] ? "on" : "", onclick: act(function () { return api("signup-mode", { mode: m[0] }); }, load) }, m[1])); });
+      var lim = {};
+      function limRow(label, key) {
+        lim[key] = h("input", { type: "number", min: "0", step: "50", value: String(s[key]), style: "width:6.5rem" });
+        return h("label", { class: "mut" }, label + " (MB) ", lim[key]);
+      }
       var ann = h("input", { placeholder: "Message (optional)", maxlength: "200", style: "flex:1;min-width:14rem", value: s.announcement || "" });
       var ip = h("input", { placeholder: "IP address to block" }), why = h("input", { placeholder: "Reason (optional)" });
       var t = h("table"), tb = h("tbody");
@@ -621,6 +632,11 @@ function rControls(body) {
         h("div", { class: "card" }, h("h2", null, "Message to everyone"),
           h("p", { class: "mut" }, "Shows as a banner to every signed-in person, e.g. \"Back online at 5pm\". Leave empty and save to remove it."),
           h("div", { class: "row" }, ann, h("button", { class: "pri", onclick: act(function () { return api("announcement", { text: ann.value }); }, function () { alert("Saved."); }) }, "Save message"))),
+        h("div", { class: "card" }, h("h2", null, "Data limits (protects your hosting bandwidth)"),
+          h("p", { class: "mut" }, "Each account can move this much data per day (resets at midnight Sydney time). The monthly budget is a total for everyone: when it is used up, the proxy pauses for all until next month. Use 0 for no limit. Render's free plan allows 5000 MB a month for the whole workspace, so keep the budget under that."),
+          h("p", { class: "mut" }, "Used this month (" + s.monthKey + "): ", h("b", null, s.monthUsedMb + " MB"), s.monthMb ? " of " + s.monthMb + " MB" : ""),
+          h("div", { class: "row" }, limRow("Free account", "freeMb"), limRow("Guest", "guestMb"), limRow("Unlimited-time account", "premiumMb"), limRow("Monthly budget", "monthMb"),
+            h("button", { class: "pri", onclick: act(function () { var b = {}; Object.keys(lim).forEach(function (k) { b[k] = lim[k].value; }); return api("limits", b); }, function () { alert("Saved."); load(); }) }, "Save limits"))),
         h("div", { class: "card" }, h("h2", null, "Who can sign up"), mRow),
         h("div", { class: "card" }, h("h2", null, "Guest access"),
           h("p", { class: "mut" }, "Guests get " + s.guestMinutes + " minutes a day with nothing saved, then see Log in / Sign up."),

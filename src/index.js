@@ -15,6 +15,8 @@
 //   ADMIN_PASSWORD  password for /admin (10+ characters). Admin is off if unset.
 //   SIGNUP_MODE     open | code | closed (default open; changeable in /admin)
 //   FREE_MINUTES    free minutes per day (default 60)
+//   FREE_MB / GUEST_MB / PREMIUM_MB  data cap per account per day in MB (defaults 300 / 100 / 2000; 0 = no cap)
+//   MONTH_MB        total data budget for everyone per month in MB (default 4000; 0 = off). Changeable in /admin.
 //   GUEST_MINUTES   guest minutes per day (default 30); GUEST_PER_IP guest sessions per IP per day (default 10)
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -86,6 +88,10 @@ if (ACCOUNTS_ON) {
 		guestMinutes: parseFloat(process.env.GUEST_MINUTES || "30") || 30,
 		guestsPerIp: parseInt(process.env.GUEST_PER_IP || "10", 10) || 10,
 		defaultSignupMode: process.env.SIGNUP_MODE || "open",
+		freeMb: parseFloat(process.env.FREE_MB || "300"),
+		guestMb: parseFloat(process.env.GUEST_MB || "100"),
+		premiumMb: parseFloat(process.env.PREMIUM_MB || "2000"),
+		monthMb: parseFloat(process.env.MONTH_MB || "4000"),
 	});
 	admin = createAdmin({ password: process.env.ADMIN_PASSWORD || "", accounts, events });
 }

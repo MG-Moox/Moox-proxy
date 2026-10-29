@@ -34,6 +34,12 @@ const SCHEMA = [
 		seconds INTEGER NOT NULL DEFAULT 0,
 		PRIMARY KEY (user_id, day)
 	)`,
+	`CREATE TABLE IF NOT EXISTS bandwidth (
+		user_id INTEGER NOT NULL,
+		day TEXT NOT NULL,
+		bytes INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (user_id, day)
+	)`,
 	`CREATE TABLE IF NOT EXISTS codes (
 		code TEXT PRIMARY KEY,
 		created INTEGER NOT NULL,

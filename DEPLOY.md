@@ -63,6 +63,7 @@ Moox can run with accounts. It switches on automatically when these settings exi
 | `ADMIN_PASSWORD` | a password only you know, 10+ characters (opens `/admin`) |
 | `SIGNUP_MODE` | optional: `open` (default), `code` or `closed`. Also changeable in the admin page |
 | `FREE_MINUTES` | optional: free minutes per day (default 60) |
+| `FREE_MB`, `GUEST_MB`, `PREMIUM_MB`, `MONTH_MB` | optional: data caps per account per day (defaults 300 / 100 / 2000) and one monthly budget for everyone (default 4000; 0 = off). Also editable in /admin. |
 | `GUEST_MINUTES` | optional: minutes per day for guests (default 30) |
 | `GUEST_PER_IP` | optional: guest sessions allowed per IP address per day (default 10) |
 
