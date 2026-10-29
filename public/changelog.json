@@ -8,7 +8,8 @@
 			"A Surprise me button in Settings picks a random look from all of them",
 			"Fixed the tools bar on phones so the last row is centered when there is an odd number of buttons",
 			"Data limits: every account now has a daily data allowance (free 300 MB, guests 100 MB), plus a monthly budget for everyone so the host's bandwidth can't run out. You get a warning near the limit",
-			"Admin: new Data limits settings and a Data today column in Users"
+			"Admin: new Data limits settings and a Data today column in Users",
+			"Added Airborne Insanity to the Apps page (Games)"
 		]
 	},
 	{
