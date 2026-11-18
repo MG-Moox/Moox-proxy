@@ -312,6 +312,25 @@ const Account = (() => {
 					  }),
 				me.dataLimitMb ? el("p", { class: "hint", text: `Data: ${Math.round(me.dataUsedMb)} of ${Math.round(me.dataLimitMb)} MB used today.` }) : null
 			),
+			el(
+				"fieldset",
+				{ class: "group" },
+				el("h3", { text: "Email address" }),
+				el("p", { class: "hint", text: me.emailVerified && me.email ? "Verified: " + me.email : me.pendingEmail ? "Waiting for verification: " + me.pendingEmail : "No email added yet. Add one to link an email address to your account." }),
+				...(!me.emailVerified ? (() => {
+					const emailInput = el("input", { type: "email", autocomplete: "email", maxlength: "254", placeholder: "you@example.com", "aria-label": "Email address", value: me.pendingEmail || "" });
+					const status = el("p", { class: "hint", role: "status", "aria-live": "polite" });
+					return [el("form", { class: "stack", onsubmit: async (e) => {
+						e.preventDefault();
+						const email = emailInput.value.trim();
+						if (!email) { status.textContent = "Enter your email address."; return; }
+						status.textContent = "Sending verification email…";
+						const r = await post("/api/email", { email });
+						status.textContent = r.ok ? ((r.body && r.body.message) || "Check your inbox.") : ((r.body && r.body.error) || "Couldn't send the email.");
+						if (r.ok) await refresh();
+					}}, emailInput, el("button", { type: "submit", class: "btn", text: me.pendingEmail ? "Resend verification email" : "Add email" })), status];
+				})() : [])
+			),
 			me.premium && me.premiumUntil === "never"
 				? null
 				: el(
