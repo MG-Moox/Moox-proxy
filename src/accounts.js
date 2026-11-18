@@ -1,7 +1,7 @@
 // Accounts for Moox Proxy: sign-up / log-in, sessions, the free daily time
 // limit (resets at midnight Sydney time), one-time unlock codes, per-account
 // data sync, live connection tracking, and the operations the admin page uses.
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
 	hashPassword,
@@ -563,6 +563,9 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		const dataUsed = await bytesToday(user.id);
 		return {
 			username: user.username,
+			email: user.email || null,
+			emailVerified: Boolean(user.email_verified),
+			pendingEmail: user.pending_email || null,
 			premium,
 			premiumUntil: premium ? (user.premium_until >= FOREVER ? "never" : user.premium_until) : null,
 			guest: Boolean(user.guest),
@@ -578,6 +581,44 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			day: sydneyDay(),
 			announcement: state.announcement,
 		};
+	}
+
+
+	async function apiEmail(req, res, ip, user) {
+		const body = await readJson(req, 3000);
+		if (user.guest) return json(res, 403, { error: "Create an account before adding an email." });
+		if (!limiter.hit(`email:${user.id}`, 4, 60 * 60_000)) return json(res, 429, { error: "Too many email requests. Please wait an hour." });
+		const email = String(body.email || "").trim().toLowerCase();
+		if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "Enter a valid email address." });
+		if (user.email && user.email.toLowerCase() === email && user.email_verified) return json(res, 200, { ok: true, message: "That email is already verified." });
+		const duplicate = await db.exec("SELECT id FROM users WHERE id<>? AND (email=? COLLATE NOCASE OR pending_email=? COLLATE NOCASE) LIMIT 1", [user.id, email, email]);
+		if (duplicate.rows.length) return json(res, 409, { error: "That email is already linked to another account." });
+		const token = randomBytes(32).toString("hex");
+		await db.exec("UPDATE users SET pending_email=?,email_token_hash=?,email_token_expires=? WHERE id=?", [email, sha256(token), Date.now()+30*60_000, user.id]);
+		clearCache();
+		const apiKey=process.env.RESEND_API_KEY, from=process.env.RESEND_FROM;
+		if(!apiKey||!from){await db.exec("UPDATE users SET pending_email=NULL,email_token_hash=NULL,email_token_expires=NULL WHERE id=?",[user.id]);return json(res,503,{error:"Email sending isn't configured yet."});}
+		const origin=String(process.env.APP_URL||((req.headers["x-forwarded-proto"]||"https")+"://"+req.headers.host)).replace(/\/+$/,"");
+		const verifyUrl=origin+"/api/email/verify?token="+token;
+		const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{authorization:"Bearer "+apiKey,"content-type":"application/json"},body:JSON.stringify({
+			from,to:[email],subject:"Verify your Moox Proxy email",
+			html:"<div style=\"font-family:Arial,sans-serif;max-width:520px;margin:auto\"><h2>Verify your email</h2><p>Click below to link this email to your Moox Proxy account.</p><p><a href=\""+verifyUrl+"\" style=\"display:inline-block;padding:12px 18px;background:#635bff;color:#fff;text-decoration:none;border-radius:8px\">Verify email</a></p><p>This link expires in 30 minutes. Ignore this email if you didn't request it.</p></div>",
+			text:"Verify your Moox Proxy email: "+verifyUrl+"\n\nThis link expires in 30 minutes."
+		})});
+		if(!response.ok){const detail=await response.text().catch(()=> "");await db.exec("UPDATE users SET pending_email=NULL,email_token_hash=NULL,email_token_expires=NULL WHERE id=?",[user.id]);events.log("email_send_failed","warn",{ip,userId:user.id,username:user.username,detail:"Resend HTTP "+response.status+" "+detail.slice(0,120)});return json(res,502,{error:"Couldn't send the verification email. Check your Resend sender settings and try again."});}
+		events.log("email_verification_sent","info",{ip,userId:user.id,username:user.username});
+		return json(res,200,{ok:true,message:"Verification email sent. Check your inbox (and spam folder)."});
+	}
+
+	async function verifyEmail(res, token) {
+		if(!/^[a-f0-9]{64}$/i.test(token||"")) return blockedPage(res,400,"Invalid link","This email verification link is invalid.");
+		const row=(await db.exec("SELECT id,pending_email FROM users WHERE email_token_hash=? AND email_token_expires>?",[sha256(token),Date.now()])).rows[0];
+		if(!row||!row.pending_email) return blockedPage(res,400,"Link expired","This link has expired or was already used. Request a new one from your account menu.");
+		try { await db.exec("UPDATE users SET email=pending_email,pending_email=NULL,email_verified=1,email_token_hash=NULL,email_token_expires=NULL WHERE id=?",[row.id]); }
+		catch(e){if(/unique/i.test(e.message))return blockedPage(res,409,"Email already used","That email address is already linked to another account.");throw e;}
+		clearCache();
+		events.log("email_verified","info",{userId:row.id,detail:"email address verified"});
+		return blockedPage(res,200,"Email verified","Your email address has been linked to your Moox Proxy account. You can close this page and return to Moox Proxy.");
 	}
 
 	// ---------- HTTP: the account API and the gate ----------
@@ -815,6 +856,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			if (path === "/api/login" && req.method === "POST") return (await apiLogin(req, res, ip), null);
 			if (path === "/api/signup" && req.method === "POST") return (await apiSignup(req, res, ip), null);
 			if (path === "/api/guest" && req.method === "POST") return (await apiGuest(req, res, ip), null);
+			if (path === "/api/email/verify" && req.method === "GET") return (await verifyEmail(res, url.searchParams.get("token")), null);
 			if (path === "/logout") {
 				const token = parseCookies(req).moox_session;
 				if (token) await db.exec("DELETE FROM sessions WHERE hash=?", [sha256(token)]).catch(() => {});
@@ -852,6 +894,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 
 			// ---- signed-in APIs ----
 			if (path === "/api/me" && req.method === "GET") return (json(res, 200, await mePayload(user)), null);
+			if (path === "/api/email" && req.method === "POST") return (await apiEmail(req, res, ip, user), null);
 			if (path === "/api/redeem" && req.method === "POST") return (await apiRedeem(req, res, ip, user), null);
 			if (path === "/api/password" && req.method === "POST") return (await apiPassword(req, res, ip, user), null);
 			if (path === "/api/logout-others" && req.method === "POST") return (await apiLogoutOthers(req, res, user), null);
@@ -956,7 +999,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			const like = "%" + String(q || "").replace(/[^A-Za-z0-9_]/g, "") + "%";
 			const rows = (
 				await db.exec(
-					`SELECT u.id,u.username,u.guest,u.created,u.banned,u.ban_reason,u.premium_until,u.last_login,u.last_ip,u.signup_ip,
+					`SELECT u.id,u.username,u.guest,u.created,u.banned,u.ban_reason,u.premium_until,u.last_login,u.last_ip,u.signup_ip,u.email,u.pending_email,u.email_verified,
 					 (SELECT seconds FROM usage WHERE user_id=u.id AND day=?) AS today,
 					 (SELECT bytes FROM bandwidth WHERE user_id=u.id AND day=?) AS bw,
 					 (SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) AS sessions
