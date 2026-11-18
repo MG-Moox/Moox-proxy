@@ -497,7 +497,10 @@ function rUsers(body) {
           ? h("button", { class: "sm", onclick: act(function () { return api("user", { id: u.id, action: "unban" }); }, load) }, "Unsuspend")
           : h("button", { class: "sm dng", onclick: function () { var r = prompt("Suspend " + u.username + "? Optional reason:", ""); if (r !== null) act(function () { return api("user", { id: u.id, action: "ban", arg: r }); }, load)(); } }, "Suspend");
         tb.append(h("tr", null,
-          h("td", null, h("b", null, u.username), h("div", { class: "mut mono" }, "#" + u.id + (u.guest ? " · guest" : ""))),
+          h("td", null, h("b", null, u.username), h("div", { class: "mut mono" }, "#" + u.id + (u.guest ? " · guest" : "")),
+            u.email ? h("div", { class: "mut" }, u.email + (u.email_verified ? " · verified" : " · unverified")) :
+              u.pending_email ? h("div", { class: "mut" }, "Pending: " + u.pending_email) :
+                (!u.guest ? h("div", { class: "mut" }, "No email") : null)),
           h("td", null, status),
           h("td", null, fmtDur(u.today)),
           h("td", null, (u.dataMb || 0) + " MB"),
