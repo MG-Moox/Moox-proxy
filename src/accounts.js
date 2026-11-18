@@ -136,13 +136,13 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		freeMb: Math.max(0, +freeMb || 0),
 		guestMb: Math.max(0, +guestMb || 0),
 		premiumMb: Math.max(0, +premiumMb || 0),
-		monthMb: Math.max(0, +monthMb || 0),
+		monthMb: 0, // Global monthly lockout disabled.
 	};
 	const MB = 1048576;
 	const bwMem = new Map(); // `${uid}:${day}` -> { bytes, delta, loaded }
 	const month = { key: sydneyDay().slice(0, 7), bytes: 0, loaded: false, alerted: false };
 	const capFor = (u) => (u && u.guest ? state.guestMb : isPremium(u) ? state.premiumMb : state.freeMb) * MB;
-	const budgetOut = () => state.monthMb > 0 && month.bytes >= state.monthMb * MB;
+	const budgetOut = () => false; // Never pause the whole proxy for a shared monthly data budget.
 	const bannedIps = new Map(); // ip -> reason
 	const sessionCache = new Map(); // hash -> { user|null, exp }
 	const usageMem = new Map(); // `${uid}:${day}` -> { seconds, dirty }
@@ -407,14 +407,6 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			}
 			for (const uid of active) addUsage(uid, elapsed);
 			noteLoad(conns.size, users.size);
-			// Enforce the daily limit for free accounts.
-			if (budgetOut() && conns.size) {
-				kickAll();
-				if (!month.alerted) {
-					month.alerted = true;
-					events.log("budget_reached", "alert", { detail: `monthly data budget of ${state.monthMb} MB used up: proxy paused until next month or until you raise it` });
-				}
-			}
 			for (const [uid] of users) {
 				const u = await getUserById(uid).catch(() => null);
 				if (!u) continue;
@@ -581,7 +573,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 			dataLimitMb: capFor(user) / MB || null,
 			dataUsedMb: Math.round((dataUsed / MB) * 10) / 10,
 			dataLimited: capFor(user) > 0 && dataUsed >= capFor(user),
-			paused: budgetOut(),
+			paused: false,
 			limited: !premium && used >= limitFor(user),
 			day: sydneyDay(),
 			announcement: state.announcement,
@@ -1122,7 +1114,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 		kickAll: () => tracker.kickAll(),
 
 		async setLimits(b) {
-			const map = { freeMb: "bw_free", guestMb: "bw_guest", premiumMb: "bw_premium", monthMb: "bw_month" };
+			const map = { freeMb: "bw_free", guestMb: "bw_guest", premiumMb: "bw_premium" };
 			for (const k of Object.keys(map)) {
 				if (b[k] === undefined) continue;
 				const n = Math.round(Number(b[k]));
@@ -1131,7 +1123,7 @@ export function createAccounts({ db, events, freeMinutes = 60, guestMinutes = 30
 				await setSetting(map[k], n);
 			}
 			month.alerted = false;
-			events.log("data_limits", "info", { detail: `data limits set: free ${state.freeMb} MB, guest ${state.guestMb} MB, unlimited-plan ${state.premiumMb} MB per day, month ${state.monthMb} MB (0 = off)` });
+			events.log("data_limits", "info", { detail: `data limits set: free ${state.freeMb} MB, guest ${state.guestMb} MB, unlimited-plan ${state.premiumMb} MB per day, shared monthly lockout disabled` });
 		},
 
 		async setAnnouncement(text) {
