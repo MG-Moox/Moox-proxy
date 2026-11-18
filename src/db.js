@@ -157,11 +157,18 @@ export function createDb({ url, token, timeoutMs = 8000 }) {
 		async migrate() {
 			await pipeline(SCHEMA.map((s) => [s, []]));
 			// Added later: marks guest accounts. Ignore "duplicate column" on existing databases.
-			try {
-				await pipeline([["ALTER TABLE users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0", []]]);
-			} catch (e) {
-				if (!/duplicate column/i.test(e.message)) throw e;
+			for (const sql of [
+				"ALTER TABLE users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0",
+				"ALTER TABLE users ADD COLUMN email TEXT",
+				"ALTER TABLE users ADD COLUMN pending_email TEXT",
+				"ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
+				"ALTER TABLE users ADD COLUMN email_token_hash TEXT",
+				"ALTER TABLE users ADD COLUMN email_token_expires INTEGER",
+			]) {
+				try { await pipeline([[sql, []]]); }
+				catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
 			}
+			await pipeline([["CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email COLLATE NOCASE) WHERE email IS NOT NULL", []]]);
 		},
 	};
 }
