@@ -34,6 +34,8 @@ input{width:100%;padding:.7rem;font-size:1rem;border:1px solid #888;border-radiu
 <form id="f" autocomplete="on">
 <label>Username<input id="u" name="username" autocomplete="username" maxlength="20" required autofocus></label>
 <label>Password<input id="p" name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+<label id="emailwrap" hidden>Email address (optional)<input id="email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com"></label>
+<p class="hint" id="emailhint" hidden>You can skip this and add an email later in Account settings.</p>
 <label id="codewrap" hidden><span id="codelabel">Access code (optional)</span><input id="c" name="code" autocomplete="off" maxlength="25" placeholder="XXXX-XXXX-XXXX-XXXX"></label>
 <div class="hp" aria-hidden="true"><label>Website<input id="w" name="website" tabindex="-1" autocomplete="off"></label></div>
 <p class="err" id="err" role="alert"></p>
@@ -57,6 +59,8 @@ function set(m){
   $("go").textContent=m==="login"?"Log in":"Create account";
   $("p").autocomplete=m==="login"?"current-password":"new-password";
   var showCode=m==="signup"&&MODE!=="closed";
+  $("emailwrap").hidden=m!=="signup";
+  $("emailhint").hidden=m!=="signup";
   $("codewrap").hidden=!showCode;
   $("codelabel").textContent=MODE==="code"?"Access code (required)":"Access code (optional)";
   $("c").required=showCode&&MODE==="code";
@@ -78,7 +82,17 @@ $("f").onsubmit=function(e){
   fetch(mode==="login"?"/api/login":"/api/signup",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)})
    .then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})})
    .then(function(x){
-     if(x.ok&&x.j.ok){location.href=x.j.next||"/";return;}
+     if(x.ok&&x.j.ok){
+       if(mode==="signup"&&$("email").value.trim()){
+         b.textContent="Sending verification email…";
+         fetch("/api/email",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({email:$("email").value.trim()})})
+          .then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})})
+          .then(function(mail){if(!mail.ok||!mail.j.ok){$("err").textContent="Account created. Email wasn’t linked: "+(mail.j.error||"You can add it later in Account settings.");b.textContent="Continue";b.disabled=false;b.onclick=function(){location.href=x.j.next||"/";};return;}location.href=x.j.next||"/";})
+          .catch(function(){$("err").textContent="Account created. You can add your email later in Account settings.";b.textContent="Continue";b.disabled=false;b.onclick=function(){location.href=x.j.next||"/";};});
+         return;
+       }
+       location.href=x.j.next||"/";return;
+     }
      $("err").textContent=x.j.error||"Something went wrong.";b.disabled=false;
    })
    .catch(function(){$("err").textContent="Could not reach the server. Try again.";b.disabled=false;});
